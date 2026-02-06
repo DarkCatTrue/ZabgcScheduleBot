@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "ZabgcScheduleBot": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}
