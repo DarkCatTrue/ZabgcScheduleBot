@@ -2,41 +2,47 @@
 {
     public class UpdateService
     {
-        private static readonly string CurrentDate;
-        private static readonly string UpdateDate;
         public static async Task <bool> GetUpdateExpressSchedule()
         {
-            string[] dates = new string[2];
-            dates = await Parse.GetDates();
+            Parse parse = new Parse();
+            string[] dates = new string[1];
+            dates = await parse.GetDates();
             
-            string currentDate = dates[1];
-            string updateDate = dates[2];
+            string currentDate = dates[0];
+            string updateDate = dates[1];
 
-            bool updateCurrentDateSchedule = await UpdateCurrentDate(currentDate);
-            if (updateCurrentDateSchedule)
+            bool updateCurrentSchedule = await UpdateAllSchedule(currentDate);
+            if (updateCurrentSchedule)
             {
                 //await SomeMethod1()q;
+                Console.WriteLine("Дата расписания была обновлена.");
                 return true;
             }
             else
             {
-                bool update = await UpdateDateSchedule(updateDate);
+                bool update = await UpdatePartSchedule(updateDate);
                 if (update)
                 {
                     //await SomeMethod2();
+                    Console.WriteLine("Дата обновления расписания была обновлена.");
                     return true;
                 }
             }
+            Console.WriteLine("Расписание не изменилось.");
             return false;
         }
 
-        private static async Task<bool> UpdateCurrentDate(string currentDate)
+        private static async Task<bool> UpdateAllSchedule(string currentDate)
         {
-            return CurrentDate != currentDate;
+            FileSystem file = new FileSystem();
+            string? currentDateFromJson = await file.GetCurrentDate();
+            return currentDateFromJson != currentDate;
         }
-        private static async Task<bool> UpdateDateSchedule(string updateDate)
+        private static async Task<bool> UpdatePartSchedule(string updateDate)
         {
-            return UpdateDate != updateDate;
+            FileSystem file = new FileSystem();
+            string? updateDateFromJson = await file.GetUpdateDate();
+            return updateDateFromJson != updateDate;
         }
     }
 }

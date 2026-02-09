@@ -1,7 +1,6 @@
 ﻿using HtmlAgilityPack;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.Collections.Specialized;
 using System.Text;
 
 namespace ZabgcScheduleBot
@@ -24,13 +23,17 @@ namespace ZabgcScheduleBot
             string dateText = CurrentDate.InnerText.Trim();
             string updateText = UpdateDate.InnerText.Trim();
 
-
-            Console.WriteLine($"{dateText}, {updateText}");
-
             return [dateText, updateText];
         }
 
-        public async Task SaveData(string fileName, string jsonName)
+        public async Task SaveAllData()
+        {
+            await SaveData("cg.htm", "Jsons\\Groups.json");
+            await SaveData("cp.htm", "Jsons\\Teachers.json");
+            await SaveData("ca.htm", "Jsons\\Audiences.json");
+        }
+
+        private async Task SaveData(string fileName, string jsonName)
         {
             string urlSchedule = DotNetEnv.Env.GetString("Url_Schedule");
 
@@ -47,7 +50,7 @@ namespace ZabgcScheduleBot
                 dict[node.InnerText.Trim()] = node.GetAttributeValue("href", "");
             }
 
-            File.WriteAllText($"{jsonName}", JsonConvert.SerializeObject(dict));
+            await File.WriteAllTextAsync($"{jsonName}", JsonConvert.SerializeObject(dict));
         }
 
         public async Task SaveSchedulePages(string jsonName, string destinaton)
@@ -71,76 +74,65 @@ namespace ZabgcScheduleBot
             }
         }
 
-        public  async Task <(string group, string date, List<string[]> cells)> GetScheduleFromWeb(string fileName)
+        public async Task<(string group, string date, List<string[]> cells)> GetScheduleFromWeb(string fileName)
         {
-            string urlSchedule = DotNetEnv.Env.GetString("Url_Schedule");
-
-            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-
-            var web = new HtmlWeb();
-            web.OverrideEncoding = Encoding.GetEncoding(1251);
-            var doc = await web.LoadFromWebAsync($"{urlSchedule}/{fileName}");
-            string group = doc.DocumentNode.SelectSingleNode("//h1")?.InnerText?.Substring(8)?.Trim() ?? "";
-
-            string date = doc.DocumentNode.SelectSingleNode("//*[@class='hd' and @rowspan='6']")?.InnerHtml?.Replace("<br>", " ").Trim() ?? "";
-
-            var table = doc.DocumentNode.SelectSingleNode("//table[@class='inf']");
-
-            table.SelectNodes(".//br")?.ToList().ForEach(br =>
-                br.ParentNode.ReplaceChild(doc.CreateTextNode(" "), br));
-
-            table.SelectNodes(".//*[@class='nul']")?.ToList().ForEach(nul =>
-                nul.InnerHtml = "Нет пары");
-
-            var cells = new List<string[]>();
-
-            table.SelectNodes(".//tr")?.Skip(3).Take(6).ToList().ForEach(row =>
-            {
-                var rowCells = row.SelectNodes(".//td[not(@class='hd' and @rowspan='6')]")?
-                    .Select(td => td.InnerText.Trim())
-                    .ToArray();
-
-                if (rowCells != null && rowCells.Length > 0)
-                {
-                    cells.Add(rowCells);
-                }
-            });
-            return (group, date, cells);
+            string url = $"{DotNetEnv.Env.GetString("Url_Schedule")}/{fileName}";
+            var doc = await LoadHtmlFromWebAsync(url);
+            return ParseSchedule(doc);
         }
 
-        public async Task <(string group, string date, List<string[]> cells)> GetScheduleFromFile(string fileName)
+        public async Task<(string group, string date, List<string[]> cells)> GetScheduleFromFile(string fileName)
         {
-            var doc = new HtmlDocument();
-            
-            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-            
-            doc.Load(fileName, Encoding.GetEncoding(1251));
+            var doc = LoadHtmlFromFile(fileName);
+            return ParseSchedule(doc);
+        }
 
-            string group = doc.DocumentNode.SelectSingleNode("//h1")?.InnerText?.Substring(8)?.Trim() ?? "";
-            
-            string date = doc.DocumentNode.SelectSingleNode("//*[@class='hd' and @rowspan='6']")?.InnerHtml?.Replace("<br>", " ").Trim() ?? "";
+        private async Task<HtmlDocument> LoadHtmlFromWebAsync(string url)
+        {
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            var web = new HtmlWeb { OverrideEncoding = Encoding.GetEncoding(1251) };
+            return await web.LoadFromWebAsync(url);
+        }
+
+        private HtmlDocument LoadHtmlFromFile(string fileName)
+        {
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            var doc = new HtmlDocument();
+            doc.Load(fileName, Encoding.GetEncoding(1251));
+            return doc;
+        }
+
+        private (string group, string date, List<string[]> cells) ParseSchedule(HtmlDocument doc)
+        {
+            string group = doc.DocumentNode.SelectSingleNode("//h1")?.InnerText?[8..]?.Trim() ?? "";
+            string date = doc.DocumentNode.SelectSingleNode("//*[@class='hd' and @rowspan='6']")?.InnerHtml?.Replace("<br>", " ")?.Trim() ?? "";
 
             var table = doc.DocumentNode.SelectSingleNode("//table[@class='inf']");
+            if (table == null) return (group, date, new List<string[]>());
 
-            table.SelectNodes(".//br")?.ToList().ForEach(br =>
-                br.ParentNode.ReplaceChild(doc.CreateTextNode(" "), br));
+            foreach (var br in table.SelectNodes(".//br") ?? Enumerable.Empty<HtmlNode>())
+                br.ParentNode.ReplaceChild(doc.CreateTextNode(" "), br);
 
-            table.SelectNodes(".//*[@class='nul']")?.ToList().ForEach(nul =>
-                nul.InnerHtml = "Нет пары");
+            foreach (var nul in table.SelectNodes(".//*[@class='nul']") ?? Enumerable.Empty<HtmlNode>())
+                nul.InnerHtml = "Нет пары";
 
             var cells = new List<string[]>();
+            var rows = table.SelectNodes(".//tr")?.Skip(3).Take(6);
 
-            table.SelectNodes(".//tr")?.Skip(3).Take(6).ToList().ForEach(row =>
+            if (rows != null)
             {
-                var rowCells = row.SelectNodes(".//td[not(@class='hd' and @rowspan='6')]")?
-                    .Select(td => td.InnerText.Trim())
-                    .ToArray();
-
-                if (rowCells != null && rowCells.Length > 0)
+                foreach (var row in rows)
                 {
-                    cells.Add(rowCells);
+                    var rowCells = row.SelectNodes(".//td[not(@class='hd' and @rowspan='6')]")
+                        ?.Select(td => td.InnerText.Trim())
+                        .Where(text => !string.IsNullOrEmpty(text))
+                        .ToArray();
+
+                    if (rowCells?.Length > 0)
+                        cells.Add(rowCells);
                 }
-            });
+            }
+
             return (group, date, cells);
         }
     }
