@@ -14,8 +14,8 @@
             bool updateCurrentSchedule = await UpdateAllSchedule(currentDate);
             if (updateCurrentSchedule)
             {
-                //await SomeMethod1()q;
                 Console.WriteLine("Дата расписания была обновлена.");
+                //await SomeMethod1()q;
                 return true;
             }
             else
@@ -23,8 +23,8 @@
                 bool update = await UpdatePartSchedule(updateDate);
                 if (update)
                 {
-                    //await SomeMethod2();
                     Console.WriteLine("Дата обновления расписания была обновлена.");
+                    //await SomeMethod2();
                     return true;
                 }
             }
@@ -35,13 +35,13 @@
         private static async Task<bool> UpdateAllSchedule(string currentDate)
         {
             FileSystem file = new FileSystem();
-            string? currentDateFromJson = await file.GetCurrentDate();
+            string? currentDateFromJson = await file.GetDate("currentDate");
             return currentDateFromJson != currentDate;
         }
         private static async Task<bool> UpdatePartSchedule(string updateDate)
         {
             FileSystem file = new FileSystem();
-            string? updateDateFromJson = await file.GetUpdateDate();
+            string? updateDateFromJson = await file.GetDate("updateDate");
             return updateDateFromJson != updateDate;
         }
     }

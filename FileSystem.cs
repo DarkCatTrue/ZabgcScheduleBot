@@ -13,9 +13,6 @@ namespace ZabgcScheduleBot
         private static string currentSchedule = "CurrentSchedule";
         private static string jsonPath = "Jsons";
         private static string updateJson = $"{jsonPath}\\Update.json";
-
-
-
         public void InitialCatalogs()
         {
             Directory.CreateDirectory(jsonPath);
@@ -23,7 +20,7 @@ namespace ZabgcScheduleBot
             Directory.CreateDirectory($"{currentSchedule}\\GroupsSchedule");
             Directory.CreateDirectory($"{currentSchedule}\\TeachersSchedule");
             Directory.CreateDirectory($"{currentSchedule}\\AudiencesSchedule");
-            Directory.CreateDirectory("pastSchedule");
+            Directory.CreateDirectory("PastSchedule");
         }
         public async Task RecordUpdateDates(string currentDate, string updateDate)
         {
@@ -35,25 +32,16 @@ namespace ZabgcScheduleBot
             string json = jObject.ToString();
             await File.WriteAllTextAsync(updateJson, json);
         }
-        public async Task<string?> GetCurrentDate()
+
+        public async Task<string?> GetDate(string dateName)
         {
             string json = await File.ReadAllTextAsync(updateJson);
 
             JObject obj = JObject.Parse(json);
 
-            string? currentDate = obj.Value<string>("currentDate");
+            string? date = obj.Value<string>(dateName);
 
-            return currentDate;
-        }
-        public async Task<string?> GetUpdateDate()
-        {
-            string json = await File.ReadAllTextAsync(updateJson);
-
-            JObject obj = JObject.Parse(json);
-
-            string? updateDate = obj.Value<string>("updateDate");
-
-            return updateDate;
+            return date;
         }
     }
 }

@@ -74,14 +74,14 @@ namespace ZabgcScheduleBot
             }
         }
 
-        public async Task<(string group, string date, List<string[]> cells)> GetScheduleFromWeb(string fileName)
+        public async Task<string> GetScheduleFromWeb(string fileName)
         {
             string url = $"{DotNetEnv.Env.GetString("Url_Schedule")}/{fileName}";
             var doc = await LoadHtmlFromWebAsync(url);
             return ParseSchedule(doc);
         }
 
-        public async Task<(string group, string date, List<string[]> cells)> GetScheduleFromFile(string fileName)
+        public async Task<string> GetScheduleFromFile(string fileName)
         {
             var doc = LoadHtmlFromFile(fileName);
             return ParseSchedule(doc);
@@ -100,15 +100,15 @@ namespace ZabgcScheduleBot
             var doc = new HtmlDocument();
             doc.Load(fileName, Encoding.GetEncoding(1251));
             return doc;
-        }
+        }   
 
-        private (string group, string date, List<string[]> cells) ParseSchedule(HtmlDocument doc)
+        private string ParseSchedule(HtmlDocument doc)
         {
             string group = doc.DocumentNode.SelectSingleNode("//h1")?.InnerText?[8..]?.Trim() ?? "";
             string date = doc.DocumentNode.SelectSingleNode("//*[@class='hd' and @rowspan='6']")?.InnerHtml?.Replace("<br>", " ")?.Trim() ?? "";
 
             var table = doc.DocumentNode.SelectSingleNode("//table[@class='inf']");
-            if (table == null) return (group, date, new List<string[]>());
+            if (table == null) return string.Empty;
 
             foreach (var br in table.SelectNodes(".//br") ?? Enumerable.Empty<HtmlNode>())
                 br.ParentNode.ReplaceChild(doc.CreateTextNode(" "), br);
@@ -118,6 +118,11 @@ namespace ZabgcScheduleBot
 
             var cells = new List<string[]>();
             var rows = table.SelectNodes(".//tr")?.Skip(3).Take(6);
+
+            var message = new StringBuilder();
+            message.AppendLine($"Группа: {group}");
+            message.AppendLine($"Дата: {date}");
+            message.AppendLine();
 
             if (rows != null)
             {
@@ -133,7 +138,12 @@ namespace ZabgcScheduleBot
                 }
             }
 
-            return (group, date, cells);
+            foreach (var row in cells)
+            {
+                message.AppendLine(string.Join(" | ", row));
+            }
+
+            return message.ToString();
         }
     }
 }
