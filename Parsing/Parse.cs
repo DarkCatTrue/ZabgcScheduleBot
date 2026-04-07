@@ -3,7 +3,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text;
 
-namespace ZabgcScheduleBot
+namespace ZabgcScheduleBot.Parsing
 {
     public class Parse
     {

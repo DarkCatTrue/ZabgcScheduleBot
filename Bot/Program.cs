@@ -1,17 +1,34 @@
-﻿using ZabgcScheduleBot;
-
-DotNetEnv.Env.Load();
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using VkNet;
+using VkNet.Model;
+using ZabgcScheduleBot.Bot;
+using ZabgcScheduleBot.Parsing;
 
 FileSystem file = new FileSystem();
 file.InitialCatalogs();
+ 
+DotNetEnv.Env.Load();
+string token = DotNetEnv.Env.GetString("VkToken");
 
-Parse parse = new Parse();
 
-//await parse.SaveAllData();
+var host = Host.CreateDefaultBuilder(args)
+    .ConfigureServices((context, services) =>
+    {
+    services.AddSingleton(sp =>
+    {
+        var api = new VkApi();
+        api.Authorize(new ApiAuthParams
+        {
+            AccessToken = token
+        });
+        return api;
+    });
 
-//await parse.SaveSchedulePages("Jsons\\Groups.json", "CurrentSchedule\\GroupsSchedule");
-//await parse.SaveSchedulePages("Jsons\\Teachers.json", "CurrentSchedule\\TeachersSchedule");
-//await parse.SaveSchedulePages("Jsons\\Audiences.json", "CurrentSchedule\\AudiencesSchedule");
+        services.AddSingleton<NotificationService>();
+        services.AddHostedService<VkBot>();
+    })
+    .Build();
 
-//Console.WriteLine(await parse.GetScheduleFromFile("CurrentSchedule\\GroupsSchedule\\cg26.htm"));
-//Console.WriteLine(await parse.GetScheduleFromWeb("cg26.htm"));
+await host.RunAsync();
+

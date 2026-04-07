@@ -1,4 +1,4 @@
-﻿namespace ZabgcScheduleBot
+﻿namespace ZabgcScheduleBot.Parsing
 {
     public class UpdateService
     {

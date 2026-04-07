@@ -1,12 +1,6 @@
 ﻿using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Text;
-using System.Text.Json.Nodes;
-using System.Xml.Linq;
 
-namespace ZabgcScheduleBot
+namespace ZabgcScheduleBot.Parsing
 {
     public class FileSystem
     {
