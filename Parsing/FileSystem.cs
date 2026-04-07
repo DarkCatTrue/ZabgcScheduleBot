@@ -14,7 +14,7 @@ namespace ZabgcScheduleBot.Parsing
             Directory.CreateDirectory($"{currentSchedule}\\GroupsSchedule");
             Directory.CreateDirectory($"{currentSchedule}\\TeachersSchedule");
             Directory.CreateDirectory($"{currentSchedule}\\AudiencesSchedule");
-            Directory.CreateDirectory("PastSchedule");
+            Directory.CreateDirectory("PreviousSchedule");
         }
         public async Task RecordUpdateDates(string currentDate, string updateDate)
         {

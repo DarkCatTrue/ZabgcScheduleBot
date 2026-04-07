@@ -4,6 +4,7 @@ using Newtonsoft.Json.Linq;
 using System.Collections.Concurrent;
 using VkNet;
 using VkNet.Model;
+using ZabgcScheduleBot.Parsing;
 
 namespace ZabgcScheduleBot.Bot
 {
@@ -13,14 +14,16 @@ namespace ZabgcScheduleBot.Bot
         private readonly VkApi _vkApi;
         private readonly ILogger<VkBot> _logger;
         private readonly NotificationService _notificationService;
+        private readonly Finder _finder;
 
         private static readonly ConcurrentDictionary<long, UserDialogState> _userStates = new();
 
-        public VkBot(VkApi vkApi, ILogger<VkBot> logger, NotificationService notificationService)
+        public VkBot(VkApi vkApi, ILogger<VkBot> logger, NotificationService notificationService, Finder finder)
         {
             _vkApi = vkApi;
             _logger = logger;
             _notificationService = notificationService;
+            _finder = finder;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -98,6 +101,7 @@ namespace ZabgcScheduleBot.Bot
                 groupId: groupId,
                 token: stoppingToken);
             return (lpServer.Server, lpServer.Key, (long)lpServer.Ts);
+            
         }
 
         private static string BuildLongPollUrl(string server, string key, long ts)
@@ -120,13 +124,23 @@ namespace ZabgcScheduleBot.Bot
             string text = update[6]?.Value<string>() ?? "";
             bool isReply = update[7] is JObject extra && extra["reply"] != null;
 
-            if (_userStates.TryGetValue(fromId, out var state) && state.AwaitingInput && isReply)
+            if (_userStates.TryGetValue(fromId, out var state) && state.Step != DialogStep.None && isReply)
             {
-                await ProcessSubscriptionInput(fromId, text, stoppingToken);
+                switch (state.Step)
+                {
+                    case DialogStep.WaitingForSubscriptionGroup:
+                        await ProcessSubscriptionInput(fromId, text, stoppingToken);
+                        break;
+                    case DialogStep.WaitingForScheduleGroup:
+                        await ProcessScheduleInput(fromId, text, stoppingToken);
+                        break;
+                }
                 _userStates.TryRemove(fromId, out _);
                 return;
             }
 
+            _logger.LogInformation($"Update from VK: {update}");
+            
             switch (text)
             {
                 case "/sub" or "Начать":
@@ -135,25 +149,13 @@ namespace ZabgcScheduleBot.Bot
                 case "/unsub":
                     await DeleteSubscribe(fromId, stoppingToken);
                     break;
-                case "/pastSchedule":
-                    await CheckPastSchedule(fromId, stoppingToken);
+                case "/previous":
+                    await StartScheduleFlow(fromId, stoppingToken);
                     break;
                 default:
                     _logger.LogInformation($"Ignored message from {fromId}: {text}");
                     break;
             }
-        }
-
-        private async Task CheckPastSchedule(long userId, CancellationToken stoppingToken)
-        {
-            await _vkApi.Messages.SendAsync(new MessagesSendParams
-            {
-                UserId = userId,
-                Message = "Введите название группы или ФИО преподавателя.\nПример названия группы: ИСиП-22-1.\nПример ФИО преподавателя: Зимин Ю.С.",
-                RandomId = new Random().Next()
-            });
-
-            _userStates[userId] = new UserDialogState { AwaitingInput = true };
         }
 
         private async Task DeleteSubscribe(long userId, CancellationToken stoppingToken)
@@ -164,6 +166,18 @@ namespace ZabgcScheduleBot.Bot
                 Message = "Вы успешно отписались от рассылки уведомлений.",
                 RandomId = new Random().Next()
             });
+       }
+
+        private async Task StartScheduleFlow(long userId, CancellationToken ct)
+        {
+            await _vkApi.Messages.SendAsync(new MessagesSendParams
+            {
+                UserId = userId,
+                Message = "Введите название группы или ФИО преподавателя для просмотра предыдущего расписания, для этого нужно ответить на это сообщение.",
+                RandomId = new Random().Next()
+            });
+
+            _userStates[userId] = new UserDialogState { Step = DialogStep.WaitingForScheduleGroup };
         }
 
         private async Task StartSubscriptionFlow(long userId, CancellationToken ct)
@@ -171,16 +185,26 @@ namespace ZabgcScheduleBot.Bot
             await _vkApi.Messages.SendAsync(new MessagesSendParams
             {
                 UserId = userId,
-                Message = "Введите название группы или ФИО преподавателя.\nПример названия группы: ИСиП-22-1.\nПример ФИО преподавателя: Зимин Ю.С.",
+                Message = "Введите название группы или ФИО преподавателя для подписки на рассылку, для этого нужно ответить на сообщение.",
                 RandomId = new Random().Next()
             });
 
-            _userStates[userId] = new UserDialogState { AwaitingInput = true };
+            _userStates[userId] = new UserDialogState { Step = DialogStep.WaitingForSubscriptionGroup };
         }
 
+        private async Task ProcessScheduleInput(long userId, string groupName, CancellationToken ct)
+        {
+            var schedule = "qqqs";
+            await _vkApi.Messages.SendAsync(new MessagesSendParams
+            {
+                UserId = userId,
+                Message = schedule,
+                RandomId = new Random().Next()
+            });
+        }
         private async Task ProcessSubscriptionInput(long userId, string input, CancellationToken ct)
         {
-            bool found = !string.IsNullOrWhiteSpace(input);
+            bool found = await _finder.Find(input);
 
             if (found)
             {
@@ -194,10 +218,17 @@ namespace ZabgcScheduleBot.Bot
             }
         }
 
+        private enum DialogStep
+        {
+            None,
+            WaitingForSubscriptionGroup,
+            WaitingForScheduleGroup
+        }
+
         private class UserDialogState
         {
-            public bool AwaitingInput { get; set; }
-            public long PromptConversationMessageId { get; set; }
+            public DialogStep Step { get; set; }
+            public string TempData { get; set; }
         }
 
     }
