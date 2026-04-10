@@ -15,7 +15,7 @@ namespace ZabgcScheduleBot.Bot
             //_botClients[PlatformType.MAX] = maxClient;
         }
 
-        public async Task SendToUserAsync(PlatformType platform, string userId, string text, CancellationToken ct)
+        public async Task SendToUserAsync(PlatformType platform, long userId, string text, CancellationToken ct)
         {
             switch (platform)
             {
@@ -23,7 +23,7 @@ namespace ZabgcScheduleBot.Bot
                     var vk = (VkApi)_botClients[PlatformType.VK];
                     await vk.Messages.SendAsync(new MessagesSendParams
                     {
-                        UserId = long.Parse(userId),
+                        UserId = userId,
                         Message = text,
                         RandomId = new Random().Next()
                     });

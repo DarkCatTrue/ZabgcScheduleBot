@@ -4,6 +4,8 @@ using Newtonsoft.Json.Linq;
 using System.Collections.Concurrent;
 using VkNet;
 using VkNet.Model;
+using ZabgcScheduleBot.API;
+using ZabgcScheduleBot.API.DTOs;
 using ZabgcScheduleBot.Parsing;
 
 namespace ZabgcScheduleBot.Bot
@@ -15,15 +17,17 @@ namespace ZabgcScheduleBot.Bot
         private readonly ILogger<VkBot> _logger;
         private readonly NotificationService _notificationService;
         private readonly Finder _finder;
+        private readonly ApiClient _apiClient;
 
         private static readonly ConcurrentDictionary<long, UserDialogState> _userStates = new();
 
-        public VkBot(VkApi vkApi, ILogger<VkBot> logger, NotificationService notificationService, Finder finder)
+        public VkBot(VkApi vkApi, ILogger<VkBot> logger, NotificationService notificationService, Finder finder, ApiClient apiClient)
         {
             _vkApi = vkApi;
             _logger = logger;
             _notificationService = notificationService;
             _finder = finder;
+            _apiClient = apiClient;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -160,12 +164,25 @@ namespace ZabgcScheduleBot.Bot
 
         private async Task DeleteSubscribe(long userId, CancellationToken stoppingToken)
         {
-            await _vkApi.Messages.SendAsync(new MessagesSendParams
+            bool userdeleted = await _apiClient.DeleteUserAsync(userId);
+            if (userdeleted)
             {
-                UserId = userId,
-                Message = "Вы успешно отписались от рассылки уведомлений.",
-                RandomId = new Random().Next()
-            });
+                await _vkApi.Messages.SendAsync(new MessagesSendParams
+                {
+                    UserId = userId,
+                    Message = "Вы успешно отписались от рассылки уведомлений.",
+                    RandomId = new Random().Next()
+                });
+            }
+            else
+            {
+                await _vkApi.Messages.SendAsync(new MessagesSendParams
+                {
+                    UserId = userId,
+                    Message = "Неудалось отписать вас от рассылки. Возможно вы не были подписаны на рассылку.",
+                    RandomId = new Random().Next()
+                });
+            }
        }
 
         private async Task StartScheduleFlow(long userId, CancellationToken ct)
@@ -205,15 +222,24 @@ namespace ZabgcScheduleBot.Bot
         private async Task ProcessSubscriptionInput(long userId, string input, CancellationToken ct)
         {
             bool found = await _finder.Find(input);
-
+            
             if (found)
             {
-                await _notificationService.SendToUserAsync(PlatformType.VK, userId.ToString(),
+                var newUser = new UsersDto
+                {
+                    ChatId = userId.ToString(),
+                    DescriptionName = input,
+                    PlatformName = PlatformType.VK.ToString()
+                };
+                
+                await _apiClient.CreateUserAsync(newUser);
+
+                await _notificationService.SendToUserAsync(PlatformType.VK, userId,
                     $"Вы успешно подписались на обновления: {input}", ct);
             }
             else
             {
-                await _notificationService.SendToUserAsync(PlatformType.VK, userId.ToString(),
+                await _notificationService.SendToUserAsync(PlatformType.VK, userId,
                     "Не найдено название группы или ФИО преподавателя с таким названием. Попробуйте снова командой /sub.", ct);
             }
         }

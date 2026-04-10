@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Hosting;
 using VkNet;
 using VkNet.Model;
+using ZabgcScheduleBot.API;
 using ZabgcScheduleBot.Bot;
 using ZabgcScheduleBot.Parsing;
 
@@ -35,6 +36,8 @@ var host = Host.CreateDefaultBuilder(args)
 
         services.AddSingleton<NotificationService>();
         services.AddSingleton<Finder>();
+        services.AddSingleton<HttpClient>();
+        services.AddHttpClient<ApiClient>();
         services.AddHostedService<VkBot>();
     })
     .Build();

@@ -23,7 +23,7 @@
                 bool update = await UpdatePartSchedule(updateDate);
                 if (update)
                 {
-                    Console.WriteLine("Дата обновления расписания была обновлена.");
+                    Console.WriteLine("Дата составления расписания была обновлена.");
                     //await SomeMethod2();
                     return true;
                 }
