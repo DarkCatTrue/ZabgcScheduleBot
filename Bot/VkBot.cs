@@ -18,16 +18,21 @@ namespace ZabgcScheduleBot.Bot
         private readonly NotificationService _notificationService;
         private readonly Finder _finder;
         private readonly ApiClient _apiClient;
+        private readonly Parse _parse;
+        private readonly FileSystem _fileSystem;
+
 
         private static readonly ConcurrentDictionary<long, UserDialogState> _userStates = new();
 
-        public VkBot(VkApi vkApi, ILogger<VkBot> logger, NotificationService notificationService, Finder finder, ApiClient apiClient)
+        public VkBot(VkApi vkApi, ILogger<VkBot> logger, NotificationService notificationService, Finder finder, ApiClient apiClient, Parse parse, FileSystem fileSystem)
         {
             _vkApi = vkApi;
             _logger = logger;
             _notificationService = notificationService;
             _finder = finder;
             _apiClient = apiClient;
+            _fileSystem = fileSystem;  
+            _parse = parse;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -136,7 +141,7 @@ namespace ZabgcScheduleBot.Bot
                         await ProcessSubscriptionInput(fromId, text, stoppingToken);
                         break;
                     case DialogStep.WaitingForScheduleGroup:
-                        await ProcessScheduleInput(fromId, text, stoppingToken);
+                        await ProcessScheduleInput(fromId, text, false, stoppingToken);
                         break;
                 }
                 _userStates.TryRemove(fromId, out _);
@@ -209,15 +214,30 @@ namespace ZabgcScheduleBot.Bot
             _userStates[userId] = new UserDialogState { Step = DialogStep.WaitingForSubscriptionGroup };
         }
 
-        private async Task ProcessScheduleInput(long userId, string groupName, CancellationToken ct)
+        private async Task ProcessScheduleInput(long userId, string descriptionName, bool isCurrentSchedule, CancellationToken ct)
         {
-            var schedule = "qqqs";
-            await _vkApi.Messages.SendAsync(new MessagesSendParams
+            bool find = await _finder.Find(descriptionName);
+            if (find)
             {
-                UserId = userId,
-                Message = schedule,
-                RandomId = new Random().Next()
-            });
+                string fileName = await _fileSystem.GetFileNameFromDescriptionName(descriptionName, isCurrentSchedule);
+                string schedule = await _parse.GetScheduleFromFile(fileName);
+                await _vkApi.Messages.SendAsync(new MessagesSendParams
+                {
+                    UserId = userId,
+                    Message = schedule,
+                    RandomId = new Random().Next()
+                });
+            }
+            else
+            {
+                await _vkApi.Messages.SendAsync(new MessagesSendParams
+                {
+                    UserId = userId,
+                    Message = "Не найдено название группы или ФИО преподавателя с таким названием. Попробуйте снова командой /previous",
+                    RandomId = new Random().Next()
+                });
+            }
+            
         }
         private async Task ProcessSubscriptionInput(long userId, string input, CancellationToken ct)
         {
@@ -240,7 +260,7 @@ namespace ZabgcScheduleBot.Bot
             else
             {
                 await _notificationService.SendToUserAsync(PlatformType.VK, userId,
-                    "Не найдено название группы или ФИО преподавателя с таким названием. Попробуйте снова командой /sub.", ct);
+                    "Не найдено название группы или ФИО преподавателя с таким названием. Попробуйте снова командой /sub", ct);
             }
         }
 

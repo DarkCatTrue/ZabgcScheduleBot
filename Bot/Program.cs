@@ -13,7 +13,8 @@ DotNetEnv.Env.Load();
 
 //Parse parse = new Parse();
 //await parse.SaveAllData();
-
+//string pena = await parse.GetScheduleFromFile("PreviousSchedule\\GroupsSchedule\\cg76.htm");
+//Console.WriteLine(pena);
 //await parse.SaveSchedulePages("Jsons\\Groups.json", "CurrentSchedule\\GroupsSchedule");
 //await parse.SaveSchedulePages("Jsons\\Teachers.json", "CurrentSchedule\\TeachersSchedule");
 //await parse.SaveSchedulePages("Jsons\\Audiences.json", "CurrentSchedule\\AudiencesSchedule");
@@ -35,7 +36,9 @@ var host = Host.CreateDefaultBuilder(args)
     });
 
         services.AddSingleton<NotificationService>();
+        services.AddSingleton<Parse>();
         services.AddSingleton<Finder>();
+        services.AddSingleton<FileSystem>();
         services.AddSingleton<HttpClient>();
         services.AddHttpClient<ApiClient>();
         services.AddHostedService<VkBot>();

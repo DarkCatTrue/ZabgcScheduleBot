@@ -13,29 +13,31 @@ namespace ZabgcScheduleBot.API
         {
             _httpClient = httpClient;
             _httpClient.BaseAddress = new Uri("http://localhost:5046/");
+            _httpClient.DefaultRequestHeaders.Accept.Clear();
+            _httpClient.DefaultRequestHeaders.Add("X-API-KEY", "qwerty");
         }
         public async Task GetUsers(UsersDto users)
         {
-            var response = await GetAsync<UsersDto>("api/users");
+            var response = await GetAsync<UsersDto>("users");
         }
 
         public async Task GetUser(UsersDto users)
         {
-            var response = await GetAsync<UsersDto>($"api/users{users.Id}");
+            var response = await GetAsync<UsersDto>($"users{users.Id}");
         }
         public async Task CreateUserAsync(UsersDto users)
         {
-            await PostAsync("api/users", users);
+            await PostAsync("users", users);
         }
 
         public async Task<bool> DeleteUserAsync(long chatId)
         {
             try
             {
-                var user = await _httpClient.GetFromJsonAsync<UsersDto>($"api/users/chats/{chatId}");
+                var user = await _httpClient.GetFromJsonAsync<UsersDto>($"users/chats/{chatId}");
                 if (user == null) return false;
 
-                await _httpClient.DeleteAsync($"api/users/{user.Id}");
+                await _httpClient.DeleteAsync($"users/{user.Id}");
 
             }
             catch 
@@ -47,7 +49,7 @@ namespace ZabgcScheduleBot.API
         }
         public async Task UpdateUserAsync(UsersDto users)
         {
-            var response = await PutAsync($"api/users/{users.Id}", users.DescriptionName);
+            var response = await PutAsync($"users/{users.Id}", users.DescriptionName);
         }
 
         private async Task<bool> PostAsync<T>(string endpoint, T data)

@@ -102,7 +102,7 @@ namespace ZabgcScheduleBot.Parsing
             return doc;
         }   
 
-        private string ParseSchedule(HtmlDocument doc)
+        private string ParseSchedule(HtmlDocument doc, ScheduleType type)
         {
             string group = doc.DocumentNode.SelectSingleNode("//h1")?.InnerText?[8..]?.Trim() ?? "";
             string date = doc.DocumentNode.SelectSingleNode("//*[@class='hd' and @rowspan='6']")?.InnerHtml?.Replace("<br>", " ")?.Trim() ?? "";
@@ -117,7 +117,8 @@ namespace ZabgcScheduleBot.Parsing
                 nul.InnerHtml = "Нет пары";
 
             var cells = new List<string[]>();
-            var rows = table.SelectNodes(".//tr")?.Skip(3).Take(6);
+            int skipCount = type == ScheduleType.Group ? 3 : 2;
+            var rows = table.SelectNodes(".//tr")?.Skip(skipCount).Take(6);
 
             var message = new StringBuilder();
             message.AppendLine($"Группа: {group}");
@@ -145,5 +146,11 @@ namespace ZabgcScheduleBot.Parsing
 
             return message.ToString();
         }
+        public enum ScheduleType
+        {
+            Group,
+            TeacherOrAudience
+        }
     }
+
 }
