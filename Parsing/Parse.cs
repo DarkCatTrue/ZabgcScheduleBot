@@ -28,11 +28,18 @@ namespace ZabgcScheduleBot.Parsing
 
         public async Task SaveAllData()
         {
+            await SaveJsons();
+            await SaveAllPages();
+        }
+
+        public async Task SaveJsons()
+        {
             await SaveData("cg.htm", "Jsons\\Groups.json");
             await SaveData("cp.htm", "Jsons\\Teachers.json");
             await SaveData("ca.htm", "Jsons\\Audiences.json");
         }
 
+        // Сохранение списка групп, аудиторий, преподавателей в json
         private async Task SaveData(string fileName, string jsonName)
         {
             string urlSchedule = DotNetEnv.Env.GetString("Url_Schedule");
@@ -51,6 +58,13 @@ namespace ZabgcScheduleBot.Parsing
             }
 
             await File.WriteAllTextAsync($"{jsonName}", JsonConvert.SerializeObject(dict));
+        }
+
+        public async Task SaveAllPages()
+        {
+            await SaveSchedulePages("Jsons\\Groups.json", "CurrentSchedule\\Groups");
+            await SaveSchedulePages("Jsons\\Audiences.json", "CurrentSchedule\\Audiences");
+            await SaveSchedulePages("Jsons\\Teachers.json", "CurrentSchedule\\Teachers");
         }
 
         public async Task SaveSchedulePages(string jsonName, string destinaton)
@@ -74,17 +88,17 @@ namespace ZabgcScheduleBot.Parsing
             }
         }
 
-        public async Task<string> GetScheduleFromWeb(string fileName)
+        public async Task<string> GetScheduleFromWeb(string fileName, ScheduleType scheduleType)
         {
             string url = $"{DotNetEnv.Env.GetString("Url_Schedule")}/{fileName}";
             var doc = await LoadHtmlFromWebAsync(url);
-            return ParseSchedule(doc);
+            return ParseSchedule(doc, scheduleType);
         }
 
-        public async Task<string> GetScheduleFromFile(string fileName)
+        public async Task<string> GetScheduleFromFile(string fileName, ScheduleType scheduleType)
         {
             var doc = LoadHtmlFromFile(fileName);
-            return ParseSchedule(doc);
+            return ParseSchedule(doc, scheduleType);
         }
 
         private async Task<HtmlDocument> LoadHtmlFromWebAsync(string url)
@@ -100,44 +114,54 @@ namespace ZabgcScheduleBot.Parsing
             var doc = new HtmlDocument();
             doc.Load(fileName, Encoding.GetEncoding(1251));
             return doc;
-        }   
+
+        }
 
         private string ParseSchedule(HtmlDocument doc, ScheduleType type)
         {
-            string group = doc.DocumentNode.SelectSingleNode("//h1")?.InnerText?[8..]?.Trim() ?? "";
-            string date = doc.DocumentNode.SelectSingleNode("//*[@class='hd' and @rowspan='6']")?.InnerHtml?.Replace("<br>", " ")?.Trim() ?? "";
+            string descriptionName = doc.DocumentNode.SelectSingleNode("//h1")?.InnerText?[0..]?.Trim() ?? "";
 
             var table = doc.DocumentNode.SelectSingleNode("//table[@class='inf']");
             if (table == null) return string.Empty;
 
             foreach (var br in table.SelectNodes(".//br") ?? Enumerable.Empty<HtmlNode>())
                 br.ParentNode.ReplaceChild(doc.CreateTextNode(" "), br);
-
             foreach (var nul in table.SelectNodes(".//*[@class='nul']") ?? Enumerable.Empty<HtmlNode>())
                 nul.InnerHtml = "Нет пары";
 
-            var cells = new List<string[]>();
-            int skipCount = type == ScheduleType.Group ? 3 : 2;
-            var rows = table.SelectNodes(".//tr")?.Skip(skipCount).Take(6);
+            var allRows = table.SelectNodes(".//tr")?.ToList();
+            if (allRows == null || allRows.Count == 0) return string.Empty;
 
-            var message = new StringBuilder();
-            message.AppendLine($"Группа: {group}");
-            message.AppendLine($"Дата: {date}");
-            message.AppendLine();
-
-            if (rows != null)
+            int startIndex = -1;
+            for (int i = 0; i < allRows.Count; i++)
             {
-                foreach (var row in rows)
+                if (allRows[i].SelectSingleNode(".//td[@rowspan='6']") != null)
                 {
-                    var rowCells = row.SelectNodes(".//td[not(@class='hd' and @rowspan='6')]")
-                        ?.Select(td => td.InnerText.Trim())
-                        .Where(text => !string.IsNullOrEmpty(text))
-                        .ToArray();
-
-                    if (rowCells?.Length > 0)
-                        cells.Add(rowCells);
+                    startIndex = i;
+                    break;
                 }
             }
+            if (startIndex == -1) return string.Empty;
+
+            var rows = allRows.Skip(startIndex).Take(6);
+
+            string date = allRows[startIndex].SelectSingleNode(".//td[@rowspan='6']")?.InnerHtml?.Replace("<br>", " ")?.Trim() ?? "";
+
+            var cells = new List<string[]>();
+            foreach (var row in rows)
+            {
+                var rowCells = row.SelectNodes(".//td[not(@class='hd' and @rowspan='6')]")
+                    ?.Select(td => td.InnerText.Trim())
+                    .Where(text => !string.IsNullOrEmpty(text))
+                    .ToArray();
+                if (rowCells?.Length > 0)
+                    cells.Add(rowCells);
+            }
+
+            var message = new StringBuilder();
+            message.AppendLine(descriptionName);
+            message.AppendLine($"Дата: {date}");
+            message.AppendLine();
 
             foreach (var row in cells)
             {
@@ -149,7 +173,7 @@ namespace ZabgcScheduleBot.Parsing
         public enum ScheduleType
         {
             Group,
-            TeacherOrAudience
+            TeacherOrAudience,
         }
     }
 

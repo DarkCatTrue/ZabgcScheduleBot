@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Json;
+﻿using Microsoft.Extensions.Logging;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using ZabgcScheduleBot.API.DTOs;
@@ -25,9 +26,23 @@ namespace ZabgcScheduleBot.API
         {
             var response = await GetAsync<UsersDto>($"users{users.Id}");
         }
+
+        public async Task<UsersDto?> GetUserByChatIdAsync(string chatId)
+        {
+            var response = await _httpClient.GetAsync($"users/chats/{chatId}");
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                return null;
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<UsersDto>();
+        }
+
         public async Task CreateUserAsync(UsersDto users)
         {
-            await PostAsync("users", users);
+            try
+            {
+                await PostAsync("users", users);
+            }
+            catch {}
         }
 
         public async Task<bool> DeleteUserAsync(long chatId)

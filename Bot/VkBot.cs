@@ -167,6 +167,107 @@ namespace ZabgcScheduleBot.Bot
             }
         }
 
+        // Ввод данных для просмотра предыдущего расписания
+        private async Task StartScheduleFlow(long userId, CancellationToken ct)
+        {
+            await _vkApi.Messages.SendAsync(new MessagesSendParams
+            {
+                UserId = userId,
+                Message = "Для просмотра предыдущего расписания, ответьте на это сообщение и введите один из параметров:\n1. Название группы\n2. ФИО преподавателя\n3. Номер аудитории\n",
+                RandomId = new Random().Next()
+            });
+
+            _userStates[userId] = new UserDialogState { Step = DialogStep.WaitingForScheduleGroup };
+        }
+
+        // Ввод данных для подписки 
+        private async Task StartSubscriptionFlow(long userId, CancellationToken ct)
+        {
+            await _vkApi.Messages.SendAsync(new MessagesSendParams
+            {
+                UserId = userId,
+                Message = "Для подписки на рассылку, ответьте на это сообщение и введите один из параметров:\n1. Название группы\n2. ФИО преподавателя\n3. Номер аудитории\n",
+                RandomId = new Random().Next()
+            });
+
+            _userStates[userId] = new UserDialogState { Step = DialogStep.WaitingForSubscriptionGroup };
+        }
+
+        // Метод на отправку расписания через имя файла
+        private async Task ProcessScheduleInput(long userId, string descriptionName, bool isCurrentSchedule, CancellationToken ct)
+        {
+            var (fileName, scheduleType) = await _fileSystem.GetFileNameFromDescriptionName(descriptionName, isCurrentSchedule);
+
+            if (scheduleType != FileSystem.ScheduleType.None && !string.IsNullOrEmpty(fileName))
+            {
+                var schedule = await _parse.GetScheduleFromFile(fileName, (Parse.ScheduleType)scheduleType);
+                await _vkApi.Messages.SendAsync(new MessagesSendParams
+                {
+                    UserId = userId,
+                    Message = schedule,
+                    RandomId = new Random().Next()
+                });
+            }
+            else
+            {
+                await _vkApi.Messages.SendAsync(new MessagesSendParams
+                {
+                    UserId = userId,
+                    Message = "Данная группа, преподаватель или аудитория не найдены.\nПовторите попытку используя команду: /previous",
+                    RandomId = new Random().Next()
+                });
+            }
+        }
+        
+        
+        // Подписка на уведомления
+        private async Task ProcessSubscriptionInput(long userId, string input, CancellationToken ct)
+        {
+            bool found = await _finder.Find(input);
+            var user = await _apiClient.GetUserByChatIdAsync(userId.ToString());
+            
+            if (user == null)
+            {
+                if (found)
+                {
+                    var newUser = new UsersDto
+                    {
+                        ChatId = userId.ToString(),
+                        DescriptionName = input,
+                        PlatformName = PlatformType.VK.ToString()
+                    };
+
+                    await _apiClient.CreateUserAsync(newUser);
+
+                    await _vkApi.Messages.SendAsync(new MessagesSendParams
+                    {
+                        UserId = userId,
+                        Message = $"Вы успешно подписались на обновления: {input}",
+                        RandomId = new Random().Next()
+                    });
+                }
+                else
+                {
+                    await _vkApi.Messages.SendAsync(new MessagesSendParams
+                    {
+                        UserId = userId,
+                        Message = "Не найдено название группы, ФИО преподавателя или аудитории с таким названием.\nПопробуйте снова командой /sub",
+                        RandomId = new Random().Next()
+                    });
+                }
+            }
+            else
+            {
+                await _vkApi.Messages.SendAsync(new MessagesSendParams
+                {
+                    UserId = userId,
+                    Message = $"Вы не можете быть подписаны на {input}, поскольку вы уже подписаны на обновления: {user.DescriptionName}.\nДля отмены подписки введите команду /unsub",
+                    RandomId = new Random().Next()
+                });
+            }
+        }
+
+        // Отписка от уведомлений
         private async Task DeleteSubscribe(long userId, CancellationToken stoppingToken)
         {
             bool userdeleted = await _apiClient.DeleteUserAsync(userId);
@@ -187,80 +288,6 @@ namespace ZabgcScheduleBot.Bot
                     Message = "Неудалось отписать вас от рассылки. Возможно вы не были подписаны на рассылку.",
                     RandomId = new Random().Next()
                 });
-            }
-       }
-
-        private async Task StartScheduleFlow(long userId, CancellationToken ct)
-        {
-            await _vkApi.Messages.SendAsync(new MessagesSendParams
-            {
-                UserId = userId,
-                Message = "Введите название группы или ФИО преподавателя для просмотра предыдущего расписания, для этого нужно ответить на это сообщение.",
-                RandomId = new Random().Next()
-            });
-
-            _userStates[userId] = new UserDialogState { Step = DialogStep.WaitingForScheduleGroup };
-        }
-
-        private async Task StartSubscriptionFlow(long userId, CancellationToken ct)
-        {
-            await _vkApi.Messages.SendAsync(new MessagesSendParams
-            {
-                UserId = userId,
-                Message = "Введите название группы или ФИО преподавателя для подписки на рассылку, для этого нужно ответить на сообщение.",
-                RandomId = new Random().Next()
-            });
-
-            _userStates[userId] = new UserDialogState { Step = DialogStep.WaitingForSubscriptionGroup };
-        }
-
-        private async Task ProcessScheduleInput(long userId, string descriptionName, bool isCurrentSchedule, CancellationToken ct)
-        {
-            bool find = await _finder.Find(descriptionName);
-            if (find)
-            {
-                string fileName = await _fileSystem.GetFileNameFromDescriptionName(descriptionName, isCurrentSchedule);
-                string schedule = await _parse.GetScheduleFromFile(fileName);
-                await _vkApi.Messages.SendAsync(new MessagesSendParams
-                {
-                    UserId = userId,
-                    Message = schedule,
-                    RandomId = new Random().Next()
-                });
-            }
-            else
-            {
-                await _vkApi.Messages.SendAsync(new MessagesSendParams
-                {
-                    UserId = userId,
-                    Message = "Не найдено название группы или ФИО преподавателя с таким названием. Попробуйте снова командой /previous",
-                    RandomId = new Random().Next()
-                });
-            }
-            
-        }
-        private async Task ProcessSubscriptionInput(long userId, string input, CancellationToken ct)
-        {
-            bool found = await _finder.Find(input);
-            
-            if (found)
-            {
-                var newUser = new UsersDto
-                {
-                    ChatId = userId.ToString(),
-                    DescriptionName = input,
-                    PlatformName = PlatformType.VK.ToString()
-                };
-                
-                await _apiClient.CreateUserAsync(newUser);
-
-                await _notificationService.SendToUserAsync(PlatformType.VK, userId,
-                    $"Вы успешно подписались на обновления: {input}", ct);
-            }
-            else
-            {
-                await _notificationService.SendToUserAsync(PlatformType.VK, userId,
-                    "Не найдено название группы или ФИО преподавателя с таким названием. Попробуйте снова командой /sub", ct);
             }
         }
 

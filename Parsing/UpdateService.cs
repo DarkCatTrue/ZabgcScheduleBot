@@ -2,7 +2,7 @@
 {
     public class UpdateService
     {
-        public static async Task <bool> GetUpdateExpressSchedule()
+        public async Task <bool> GetUpdateExpressSchedule()
         {
             Parse parse = new Parse();
             string[] dates = new string[1];

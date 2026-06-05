@@ -8,9 +8,9 @@ namespace ZabgcScheduleBot.Parsing
         private static string previousSchedule = "PreviousSchedule";
         private static string jsonPath = "Jsons";
         private static string updateJson = $"{jsonPath}\\Update.json";
-        private static string groupsDirectory = $"{currentSchedule}\\GroupsSchedule";
-        private static string teachersDirectory = $"{currentSchedule}\\TeachersSchedule";
-        private static string audiencesDirectory = $"{currentSchedule}\\AudiencesSchedule";
+        private static string groupsDirectory = $"{currentSchedule}\\Groups";
+        private static string teachersDirectory = $"{currentSchedule}\\Teachers";
+        private static string audiencesDirectory = $"{currentSchedule}\\Audiences";
 
         public void InitialCatalogs()
         {
@@ -42,17 +42,44 @@ namespace ZabgcScheduleBot.Parsing
 
             return date;
         }
-        public async Task<string> GetFileNameFromDescriptionName(string key, bool isCurrent)
+
+        public async Task CopyOldSchedule()
+        {
+            await CopyFilesAsync($"{currentSchedule}\\Groups", $"{previousSchedule}\\Groups");
+            await CopyFilesAsync($"{currentSchedule}\\Teachers", $"{previousSchedule}\\Teachers");
+            await CopyFilesAsync($"{currentSchedule}\\Audiences", $"{previousSchedule}\\Audiences");
+        }
+
+        public static Task CopyFilesAsync(string sourceDir, string destDir)
+        {
+            return Task.Run(() =>
+            {
+                foreach (var filePath in Directory.GetFiles(sourceDir))
+                {
+                    var fileName = Path.GetFileName(filePath);
+                    var destFile = Path.Combine(destDir, fileName);
+                    File.Copy(filePath, destFile, overwrite: true);
+                }
+            });
+        }
+
+        public enum ScheduleType
+        {
+            None,
+            Group,
+            TeacherOrAudience
+        }
+        public async Task<(string Path, ScheduleType Type)> GetFileNameFromDescriptionName(string key, bool isCurrent)
         {
             string rootFolder = isCurrent ? "CurrentSchedule" : "PreviousSchedule";
-            var files = new (string Path, string Prefix, string Type)[]
+            var files = new (string FilePath, string Prefix, ScheduleType Type)[]
             {
-                ("Jsons/Groups.json", $"{rootFolder}\\GroupsSchedule\\", "Groups"),
-                ("Jsons/Teachers.json", $"{rootFolder}\\TeachersSchedule\\", "Teachers"),
-                ("Jsons/Audiences.json", $"{rootFolder}\\AudiencesSchedule\\", "Audiences")
+                ("Jsons/Groups.json", $"{rootFolder}\\GroupsSchedule\\", ScheduleType.Group),
+                ("Jsons/Teachers.json", $"{rootFolder}\\TeachersSchedule\\", ScheduleType.TeacherOrAudience),
+                ("Jsons/Audiences.json", $"{rootFolder}\\AudiencesSchedule\\", ScheduleType.TeacherOrAudience)
             };
 
-            foreach (var (filePath, prefix, type) in files)
+            foreach (var (filePath, prefix, scheduleType) in files)
             {
                 if (!File.Exists(filePath)) continue;
 
@@ -62,10 +89,10 @@ namespace ZabgcScheduleBot.Parsing
                 if (token != null)
                 {
                     string value = token.ToString();
-                    return prefix + value;
+                    return (prefix + value, scheduleType);
                 }
             }
-            return string.Empty;
+            return (string.Empty, ScheduleType.None);
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using VkNet;
 using VkNet.Model;
+using ZabgcScheduleBot.Parsing;
 
 namespace ZabgcScheduleBot.Bot
 {
@@ -12,10 +13,8 @@ namespace ZabgcScheduleBot.Bot
         {
             _botClients = new ConcurrentDictionary<PlatformType, object>();
             _botClients[PlatformType.VK] = vkApi;
-            //_botClients[PlatformType.MAX] = maxClient;
         }
-
-        public async Task SendToUserAsync(PlatformType platform, long userId, string text, CancellationToken ct)
+        public async Task SendToUserAsync(PlatformType platform, long userId, string text)
         {
             switch (platform)
             {
@@ -28,11 +27,6 @@ namespace ZabgcScheduleBot.Bot
                         RandomId = new Random().Next()
                     });
                     break;
-
-                //case PlatformType.MAX:
-                //    var tg = (IMaxBotClient)_botClients[PlatformType.MAX];
-                //    await tg.SendTextMessageAsync(userId, text);
-                //    break;
             }
         }
     }

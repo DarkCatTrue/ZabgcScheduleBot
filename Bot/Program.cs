@@ -11,6 +11,8 @@ file.InitialCatalogs();
 
 DotNetEnv.Env.Load();
 
+FileSystem files = new FileSystem();
+await files.CopyOldSchedule();
 //Parse parse = new Parse();
 //await parse.SaveAllData();
 //string pena = await parse.GetScheduleFromFile("PreviousSchedule\\GroupsSchedule\\cg76.htm");
@@ -34,7 +36,7 @@ var host = Host.CreateDefaultBuilder(args)
         });
         return api;
     });
-
+        
         services.AddSingleton<NotificationService>();
         services.AddSingleton<Parse>();
         services.AddSingleton<Finder>();
