@@ -19,7 +19,11 @@ namespace ZabgcScheduleBot.Parsing
             Directory.CreateDirectory(groupsDirectory);
             Directory.CreateDirectory(teachersDirectory);
             Directory.CreateDirectory(audiencesDirectory);
+           
             Directory.CreateDirectory(previousSchedule);
+            Directory.CreateDirectory(Path.Combine(previousSchedule, "Groups"));
+            Directory.CreateDirectory(Path.Combine(previousSchedule, "Teachers"));
+            Directory.CreateDirectory(Path.Combine(previousSchedule, "Audiences"));
         }
         public async Task RecordUpdateDates(string currentDate, string updateDate)
         {
@@ -45,9 +49,9 @@ namespace ZabgcScheduleBot.Parsing
 
         public async Task CopyOldSchedule()
         {
-            await CopyFilesAsync($"{currentSchedule}\\Groups", $"{previousSchedule}\\Groups");
-            await CopyFilesAsync($"{currentSchedule}\\Teachers", $"{previousSchedule}\\Teachers");
-            await CopyFilesAsync($"{currentSchedule}\\Audiences", $"{previousSchedule}\\Audiences");
+            await CopyFilesAsync(groupsDirectory, $"{previousSchedule}\\Groups");
+            await CopyFilesAsync(teachersDirectory, $"{previousSchedule}\\Teachers");
+            await CopyFilesAsync(audiencesDirectory, $"{previousSchedule}\\Audiences");
         }
 
         public static Task CopyFilesAsync(string sourceDir, string destDir)
@@ -69,14 +73,15 @@ namespace ZabgcScheduleBot.Parsing
             Group,
             TeacherOrAudience
         }
+
         public async Task<(string Path, ScheduleType Type)> GetFileNameFromDescriptionName(string key, bool isCurrent)
         {
             string rootFolder = isCurrent ? "CurrentSchedule" : "PreviousSchedule";
             var files = new (string FilePath, string Prefix, ScheduleType Type)[]
             {
-                ("Jsons/Groups.json", $"{rootFolder}\\GroupsSchedule\\", ScheduleType.Group),
-                ("Jsons/Teachers.json", $"{rootFolder}\\TeachersSchedule\\", ScheduleType.TeacherOrAudience),
-                ("Jsons/Audiences.json", $"{rootFolder}\\AudiencesSchedule\\", ScheduleType.TeacherOrAudience)
+                ("Jsons/Groups.json", $"{rootFolder}\\Groups\\", ScheduleType.Group),
+                ("Jsons/Teachers.json", $"{rootFolder}\\Teachers\\", ScheduleType.TeacherOrAudience),
+                ("Jsons/Audiences.json", $"{rootFolder}\\Audiences\\", ScheduleType.TeacherOrAudience)
             };
 
             foreach (var (filePath, prefix, scheduleType) in files)

@@ -17,9 +17,9 @@ namespace ZabgcScheduleBot.API
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Add("X-API-KEY", "qwerty");
         }
-        public async Task GetUsers(UsersDto users)
+        public async Task<List<UsersDto>?> GetAllUsersAsync()
         {
-            var response = await GetAsync<UsersDto>("users");
+            return await _httpClient.GetFromJsonAsync<List<UsersDto>>("users");
         }
 
         public async Task GetUser(UsersDto users)
@@ -62,6 +62,13 @@ namespace ZabgcScheduleBot.API
             }
             return true;
         }
+
+        public async Task<bool> DeleteUserByIdAsync(int id)
+        {
+            var response = await _httpClient.DeleteAsync($"users/{id}");
+            return response.IsSuccessStatusCode;
+        }
+
         public async Task UpdateUserAsync(UsersDto users)
         {
             var response = await PutAsync($"users/{users.Id}", users.DescriptionName);

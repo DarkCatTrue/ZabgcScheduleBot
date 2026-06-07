@@ -5,21 +5,15 @@ using VkNet.Model;
 using ZabgcScheduleBot.API;
 using ZabgcScheduleBot.Bot;
 using ZabgcScheduleBot.Parsing;
+using ZabgcScheduleBot.Services;
+
+DotNetEnv.Env.Load();
 
 FileSystem file = new FileSystem();
 file.InitialCatalogs();
 
-DotNetEnv.Env.Load();
-
-FileSystem files = new FileSystem();
-await files.CopyOldSchedule();
-//Parse parse = new Parse();
-//await parse.SaveAllData();
-//string pena = await parse.GetScheduleFromFile("PreviousSchedule\\GroupsSchedule\\cg76.htm");
-//Console.WriteLine(pena);
-//await parse.SaveSchedulePages("Jsons\\Groups.json", "CurrentSchedule\\GroupsSchedule");
-//await parse.SaveSchedulePages("Jsons\\Teachers.json", "CurrentSchedule\\TeachersSchedule");
-//await parse.SaveSchedulePages("Jsons\\Audiences.json", "CurrentSchedule\\AudiencesSchedule");
+Parse parse = new Parse();
+await parse.SaveAllData(isFirstTime:true);
 
 string token = DotNetEnv.Env.GetString("VkToken");
 
@@ -37,13 +31,14 @@ var host = Host.CreateDefaultBuilder(args)
         return api;
     });
         
-        services.AddSingleton<NotificationService>();
         services.AddSingleton<Parse>();
         services.AddSingleton<Finder>();
         services.AddSingleton<FileSystem>();
         services.AddSingleton<HttpClient>();
         services.AddHttpClient<ApiClient>();
+        services.AddSingleton<NotificationService>();
         services.AddHostedService<VkBot>();
+        services.AddHostedService<UpdateCheckerBackgroundService>();
     })
     .Build();
 

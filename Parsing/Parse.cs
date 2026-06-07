@@ -7,6 +7,7 @@ namespace ZabgcScheduleBot.Parsing
 {
     public class Parse
     {
+        FileSystem fileSystem = new FileSystem();
         public async Task<string[]> GetDates()
         {
             string urlSchedule = DotNetEnv.Env.GetString("Url_Schedule");
@@ -26,10 +27,24 @@ namespace ZabgcScheduleBot.Parsing
             return [dateText, updateText];
         }
 
-        public async Task SaveAllData()
+        public async Task SaveAllData(bool isFirstTime)
         {
             await SaveJsons();
-            await SaveAllPages();
+
+            if (isFirstTime)
+            {
+                await SaveAllPages();
+                string[] dates = new string[1];
+                dates = await GetDates();
+                string currentDate = dates[0];
+                string updateDate = dates[1];
+                await fileSystem.RecordUpdateDates(currentDate, updateDate);
+            }
+            else
+            {
+                await fileSystem.CopyOldSchedule();
+                await SaveAllPages();
+            }
         }
 
         public async Task SaveJsons()
@@ -88,17 +103,17 @@ namespace ZabgcScheduleBot.Parsing
             }
         }
 
-        public async Task<string> GetScheduleFromWeb(string fileName, ScheduleType scheduleType)
+        public async Task<string> GetScheduleFromWeb(string fileName)
         {
             string url = $"{DotNetEnv.Env.GetString("Url_Schedule")}/{fileName}";
             var doc = await LoadHtmlFromWebAsync(url);
-            return ParseSchedule(doc, scheduleType);
+            return ParseSchedule(doc);
         }
 
-        public async Task<string> GetScheduleFromFile(string fileName, ScheduleType scheduleType)
+        public async Task<string> GetScheduleFromFile(string fileName)
         {
             var doc = LoadHtmlFromFile(fileName);
-            return ParseSchedule(doc, scheduleType);
+            return ParseSchedule(doc);
         }
 
         private async Task<HtmlDocument> LoadHtmlFromWebAsync(string url)
@@ -117,7 +132,7 @@ namespace ZabgcScheduleBot.Parsing
 
         }
 
-        private string ParseSchedule(HtmlDocument doc, ScheduleType type)
+        public string ParseSchedule(HtmlDocument doc)
         {
             string descriptionName = doc.DocumentNode.SelectSingleNode("//h1")?.InnerText?[0..]?.Trim() ?? "";
 

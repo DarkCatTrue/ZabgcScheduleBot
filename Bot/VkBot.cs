@@ -7,6 +7,7 @@ using VkNet.Model;
 using ZabgcScheduleBot.API;
 using ZabgcScheduleBot.API.DTOs;
 using ZabgcScheduleBot.Parsing;
+using ZabgcScheduleBot.Services;
 
 namespace ZabgcScheduleBot.Bot
 {
@@ -15,7 +16,6 @@ namespace ZabgcScheduleBot.Bot
     {
         private readonly VkApi _vkApi;
         private readonly ILogger<VkBot> _logger;
-        private readonly NotificationService _notificationService;
         private readonly Finder _finder;
         private readonly ApiClient _apiClient;
         private readonly Parse _parse;
@@ -24,11 +24,10 @@ namespace ZabgcScheduleBot.Bot
 
         private static readonly ConcurrentDictionary<long, UserDialogState> _userStates = new();
 
-        public VkBot(VkApi vkApi, ILogger<VkBot> logger, NotificationService notificationService, Finder finder, ApiClient apiClient, Parse parse, FileSystem fileSystem)
+        public VkBot(VkApi vkApi, ILogger<VkBot> logger, Finder finder, ApiClient apiClient, Parse parse, FileSystem fileSystem)
         {
             _vkApi = vkApi;
             _logger = logger;
-            _notificationService = notificationService;
             _finder = finder;
             _apiClient = apiClient;
             _fileSystem = fileSystem;  
@@ -193,14 +192,14 @@ namespace ZabgcScheduleBot.Bot
             _userStates[userId] = new UserDialogState { Step = DialogStep.WaitingForSubscriptionGroup };
         }
 
-        // Метод на отправку расписания через имя файла
+        // Метод для просмотра старого расписания
         private async Task ProcessScheduleInput(long userId, string descriptionName, bool isCurrentSchedule, CancellationToken ct)
         {
             var (fileName, scheduleType) = await _fileSystem.GetFileNameFromDescriptionName(descriptionName, isCurrentSchedule);
 
             if (scheduleType != FileSystem.ScheduleType.None && !string.IsNullOrEmpty(fileName))
             {
-                var schedule = await _parse.GetScheduleFromFile(fileName, (Parse.ScheduleType)scheduleType);
+                var schedule = await _parse.GetScheduleFromFile(fileName);
                 await _vkApi.Messages.SendAsync(new MessagesSendParams
                 {
                     UserId = userId,
