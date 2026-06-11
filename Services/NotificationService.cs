@@ -73,7 +73,7 @@ namespace ZabgcScheduleBot.Services
                 if (updateAllSchedule)
                 {
                     _logger.LogInformation("Дата расписания была обновлена.");
-                    await SendExpressSchedule(isUpdateAllSchedule: updateAllSchedule);
+                    await SendExpressSchedule(isUpdateAllSchedule: true);
                 }
                 else
                 {
@@ -81,10 +81,10 @@ namespace ZabgcScheduleBot.Services
                     if (updatePartSchedule)
                     {
                         _logger.LogInformation("Дата составления расписания была обновлена.");
-                        await SendExpressSchedule(isUpdateAllSchedule: updatePartSchedule);
+                        await SendExpressSchedule(isUpdateAllSchedule: false);
                     }
                 }
-                await _fileSystem.RecordUpdateDates(currentDate, updateDate);
+                await _fileSystem.RecordDates(currentDate, updateDate);
             }
             finally
             {
@@ -93,19 +93,13 @@ namespace ZabgcScheduleBot.Services
             
         }
 
-
         private async Task SendExpressSchedule(bool isUpdateAllSchedule)
         {
-            await _parse.SaveAllData(isFirstTime: false);
+            await _parse.SaveJsons();
             await (isUpdateAllSchedule ? SendScheduleToAllSubscribersAsync() : SendScheduleToPartSubscribersAsync() );
         }
 
         private async Task SendScheduleToPartSubscribersAsync()
-        {
-
-        }
-
-        private async Task SendScheduleToAllSubscribersAsync()
         {
             bool isCurrent = true;
             var allUsers = await _apiClient.GetAllUsersAsync();
@@ -121,6 +115,7 @@ namespace ZabgcScheduleBot.Services
                 var descriptionName = group.Key;
 
                 var (fileName, scheduleType) = await _fileSystem.GetFileNameFromDescriptionName(descriptionName, isCurrent);
+                var (filePath, scheduleTypePath) = await _fileSystem.GetFullPathFromDescriptionName(descriptionName, isCurrent);
 
                 if (scheduleType == ScheduleType.None)
                 {
@@ -138,7 +133,64 @@ namespace ZabgcScheduleBot.Services
                 }
                 try
                 {
-                    string scheduleText = await _parse.GetScheduleFromFile(fileName);
+                    bool scheduleIsDifferent = await _parse.ScheduleIsDifferent(fileName, filePath);
+                    if (scheduleIsDifferent)
+                    {
+                        string scheduleText = "Ваше расписание было изменено:\n" + await _parse.GetScheduleFromWeb(fileName);
+                        foreach (var user in group)
+                        {
+                            await SendToUserAsync(
+                                Enum.Parse<PlatformType>(user.PlatformName),
+                                long.Parse(user.ChatId),
+                                scheduleText);
+                            await Task.Delay(100);
+                        }
+                    }         
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Ошибка парсинга расписания для {descriptionName}");
+                }
+
+            }
+            await _parse.SaveAllPages();
+        }
+
+        private async Task SendScheduleToAllSubscribersAsync()
+        {
+            await _parse.SaveDataBeforeNotification();
+            bool isCurrent = true;
+            var allUsers = await _apiClient.GetAllUsersAsync();
+            if (allUsers == null || !allUsers.Any()) return;
+
+            var groups = allUsers
+                .Where(u => !string.IsNullOrEmpty(u.DescriptionName))
+                .GroupBy(u => u.DescriptionName)
+                .ToList();
+
+            foreach (var group in groups)
+            {
+                var descriptionName = group.Key;
+
+                var (filepath, scheduleType) = await _fileSystem.GetFullPathFromDescriptionName(descriptionName, isCurrent);
+
+                if (scheduleType == ScheduleType.None)
+                {
+                    foreach (var user in group)
+                    {
+                        await SendToUserAsync(
+                            Enum.Parse<PlatformType>(user.PlatformName),
+                            long.Parse(user.ChatId),
+                            $"Рассылка для \"{descriptionName}\" прекращена: этот объект больше не существует в расписании.");
+
+                        await _apiClient.DeleteUserByIdAsync(user.Id);
+                        await Task.Delay(100);
+                    }
+                    continue;
+                }
+                try
+                {
+                    string scheduleText = "Появилось новое расписание!\n" + await _parse.GetScheduleFromFile(filepath);
 
                     foreach (var user in group)
                     {

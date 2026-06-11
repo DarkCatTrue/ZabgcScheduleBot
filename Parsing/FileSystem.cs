@@ -25,7 +25,7 @@ namespace ZabgcScheduleBot.Parsing
             Directory.CreateDirectory(Path.Combine(previousSchedule, "Teachers"));
             Directory.CreateDirectory(Path.Combine(previousSchedule, "Audiences"));
         }
-        public async Task RecordUpdateDates(string currentDate, string updateDate)
+        public async Task RecordDates(string currentDate, string updateDate)
         {
             JObject jObject = new JObject
             {
@@ -35,6 +35,7 @@ namespace ZabgcScheduleBot.Parsing
             string json = jObject.ToString();
             await File.WriteAllTextAsync(updateJson, json);
         }
+
 
         public async Task<string?> GetDate(string dateName)
         {
@@ -75,6 +76,33 @@ namespace ZabgcScheduleBot.Parsing
         }
 
         public async Task<(string Path, ScheduleType Type)> GetFileNameFromDescriptionName(string key, bool isCurrent)
+        {
+            string rootFolder = isCurrent ? "CurrentSchedule" : "PreviousSchedule";
+            var files = new (string FilePath, string Prefix, ScheduleType Type)[]
+            {
+                ("Jsons/Groups.json", $"{rootFolder}\\Groups\\", ScheduleType.Group),
+                ("Jsons/Teachers.json", $"{rootFolder}\\Teachers\\", ScheduleType.TeacherOrAudience),
+                ("Jsons/Audiences.json", $"{rootFolder}\\Audiences\\", ScheduleType.TeacherOrAudience)
+            };
+
+            foreach (var (filePath, prefix, scheduleType) in files)
+            {
+                if (!File.Exists(filePath)) continue;
+
+                string json = await File.ReadAllTextAsync(filePath);
+                var obj = JObject.Parse(json);
+                var token = obj[key];
+                if (token != null)
+                {
+                    string value = token.ToString();
+                    return (value, scheduleType);
+
+                }
+            }
+            return (string.Empty, ScheduleType.None);
+        }
+
+        public async Task<(string Path, ScheduleType Type)> GetFullPathFromDescriptionName(string key, bool isCurrent)
         {
             string rootFolder = isCurrent ? "CurrentSchedule" : "PreviousSchedule";
             var files = new (string FilePath, string Prefix, ScheduleType Type)[]

@@ -13,7 +13,7 @@ FileSystem file = new FileSystem();
 file.InitialCatalogs();
 
 Parse parse = new Parse();
-await parse.SaveAllData(isFirstTime:true);
+await parse.SaveAllData();
 
 string token = DotNetEnv.Env.GetString("VkToken");
 

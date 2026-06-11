@@ -195,7 +195,7 @@ namespace ZabgcScheduleBot.Bot
         // Метод для просмотра старого расписания
         private async Task ProcessScheduleInput(long userId, string descriptionName, bool isCurrentSchedule, CancellationToken ct)
         {
-            var (fileName, scheduleType) = await _fileSystem.GetFileNameFromDescriptionName(descriptionName, isCurrentSchedule);
+            var (fileName, scheduleType) = await _fileSystem.GetFullPathFromDescriptionName(descriptionName, isCurrentSchedule);
 
             if (scheduleType != FileSystem.ScheduleType.None && !string.IsNullOrEmpty(fileName))
             {

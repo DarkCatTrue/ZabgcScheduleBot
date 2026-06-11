@@ -26,25 +26,25 @@ namespace ZabgcScheduleBot.Parsing
 
             return [dateText, updateText];
         }
-
-        public async Task SaveAllData(bool isFirstTime)
+        public async Task SaveAllData()
         {
             await SaveJsons();
-
-            if (isFirstTime)
-            {
-                await SaveAllPages();
-                string[] dates = new string[1];
-                dates = await GetDates();
-                string currentDate = dates[0];
-                string updateDate = dates[1];
-                await fileSystem.RecordUpdateDates(currentDate, updateDate);
-            }
-            else
-            {
-                await fileSystem.CopyOldSchedule();
-                await SaveAllPages();
-            }
+            await SaveAllPages();
+            await RecordUpdateDates();
+            await fileSystem.CopyOldSchedule();
+        }
+        public async Task SaveDataBeforeNotification()
+        {
+            await fileSystem.CopyOldSchedule();
+            await SaveAllPages();
+        }
+        public async Task RecordUpdateDates()
+        {
+            string[] dates = new string[1];
+            dates = await GetDates();
+            string currentDate = dates[0];
+            string updateDate = dates[1];
+            await fileSystem.RecordDates(currentDate, updateDate);
         }
 
         public async Task SaveJsons()
@@ -110,10 +110,21 @@ namespace ZabgcScheduleBot.Parsing
             return ParseSchedule(doc);
         }
 
-        public async Task<string> GetScheduleFromFile(string fileName)
+        public async Task<string> GetScheduleFromFile(string filepath)
         {
-            var doc = LoadHtmlFromFile(fileName);
+            var doc = LoadHtmlFromFile(filepath);
             return ParseSchedule(doc);
+        }
+
+        public async Task<bool> ScheduleIsDifferent(string fileName, string filePath)
+        {
+            string webSchedule = await GetScheduleFromWeb(fileName);
+            string fileSchedule = await GetScheduleFromFile(filePath);
+            if (webSchedule != fileSchedule)
+            {
+                return true;
+            }
+            return false;
         }
 
         private async Task<HtmlDocument> LoadHtmlFromWebAsync(string url)
