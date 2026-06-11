@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using VkNet;
 using VkNet.Model;
 using ZabgcScheduleBot.API;
+using ZabgcScheduleBot.API.DTOs;
 using ZabgcScheduleBot.Parsing;
 using static ZabgcScheduleBot.Parsing.FileSystem;
 
@@ -54,6 +55,8 @@ namespace ZabgcScheduleBot.Services
                     break;
             }
         }
+
+        // Метод для получения обновлений из Экспресс-расписания
         public async Task GetUpdateExpressSchedule()
         {
             if (!await _semaphore.WaitAsync(0))
@@ -63,9 +66,7 @@ namespace ZabgcScheduleBot.Services
             }
             try
             {
-                string[] dates = new string[1];
-                dates = await _parse.GetDates();
-
+                string[] dates = await _parse.GetDates();
                 string currentDate = dates[0];
                 string updateDate = dates[1];
 
@@ -73,7 +74,8 @@ namespace ZabgcScheduleBot.Services
                 if (updateAllSchedule)
                 {
                     _logger.LogInformation("Дата расписания была обновлена.");
-                    await SendExpressSchedule(isUpdateAllSchedule: true);
+                    await _parse.SaveDataBeforeNotification();
+                    await ProcessUpdatesAsync(isFullUpdate: true);
                 }
                 else
                 {
@@ -81,7 +83,8 @@ namespace ZabgcScheduleBot.Services
                     if (updatePartSchedule)
                     {
                         _logger.LogInformation("Дата составления расписания была обновлена.");
-                        await SendExpressSchedule(isUpdateAllSchedule: false);
+                        await ProcessUpdatesAsync(isFullUpdate: false);
+                        await _parse.SaveAllPages();
                     }
                 }
                 await _fileSystem.RecordDates(currentDate, updateDate);
@@ -90,20 +93,15 @@ namespace ZabgcScheduleBot.Services
             {
                 _semaphore.Release();
             }
-            
         }
-
-        private async Task SendExpressSchedule(bool isUpdateAllSchedule)
+        
+        // Общий метод перед отправкой расписания
+        private async Task ProcessUpdatesAsync(bool isFullUpdate)
         {
             await _parse.SaveJsons();
-            await (isUpdateAllSchedule ? SendScheduleToAllSubscribersAsync() : SendScheduleToPartSubscribersAsync() );
-        }
-
-        private async Task SendScheduleToPartSubscribersAsync()
-        {
-            bool isCurrent = true;
             var allUsers = await _apiClient.GetAllUsersAsync();
-            if (allUsers == null || !allUsers.Any()) return;
+            if (allUsers == null || !allUsers.Any())
+                return;
 
             var groups = allUsers
                 .Where(u => !string.IsNullOrEmpty(u.DescriptionName))
@@ -112,100 +110,63 @@ namespace ZabgcScheduleBot.Services
 
             foreach (var group in groups)
             {
-                var descriptionName = group.Key;
-
-                var (fileName, scheduleType) = await _fileSystem.GetFileNameFromDescriptionName(descriptionName, isCurrent);
-                var (filePath, scheduleTypePath) = await _fileSystem.GetFullPathFromDescriptionName(descriptionName, isCurrent);
+                string descriptionName = group.Key;
+                var (filePath, scheduleType) = await _fileSystem.GetFullPathFromDescriptionName(descriptionName, isCurrent: true);
 
                 if (scheduleType == ScheduleType.None)
                 {
-                    foreach (var user in group)
-                    {
-                        await SendToUserAsync(
-                            Enum.Parse<PlatformType>(user.PlatformName),
-                            long.Parse(user.ChatId),
-                            $"Рассылка для \"{descriptionName}\" прекращена: этот объект больше не существует в расписании.");
-
-                        await _apiClient.DeleteUserByIdAsync(user.Id);
-                        await Task.Delay(100);
-                    }
+                    await NotifyAndDeleteSubscribersAsync(group, descriptionName);
                     continue;
                 }
+
                 try
                 {
-                    bool scheduleIsDifferent = await _parse.ScheduleIsDifferent(fileName, filePath);
-                    if (scheduleIsDifferent)
+                    if (isFullUpdate)
                     {
-                        string scheduleText = "Ваше расписание было изменено:\n" + await _parse.GetScheduleFromWeb(fileName);
-                        foreach (var user in group)
+                        string scheduleText = "Появилось новое расписание!\n" + await _parse.GetScheduleFromFile(filePath);
+                        await SendScheduleToGroupAsync(group, scheduleText);
+                    }
+                    else
+                    {
+                        bool scheduleIsDifferent = await _parse.ScheduleIsDifferent(descriptionName, filePath);
+                        if (scheduleIsDifferent)
                         {
-                            await SendToUserAsync(
-                                Enum.Parse<PlatformType>(user.PlatformName),
-                                long.Parse(user.ChatId),
-                                scheduleText);
-                            await Task.Delay(100);
+                            string scheduleText = "Ваше расписание было изменено:\n" + await _parse.GetScheduleFromFile(filePath);
+                            await SendScheduleToGroupAsync(group, scheduleText);
                         }
-                    }         
+                    }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, $"Ошибка парсинга расписания для {descriptionName}");
+                    _logger.LogError(ex, $"Ошибка обработки расписания для {descriptionName}");
                 }
-
             }
-            await _parse.SaveAllPages();
         }
 
-        private async Task SendScheduleToAllSubscribersAsync()
+        // Уведомление пользователя и удаление из бд, если группа/аудитория/преподаватель больше не находится в расписании
+        private async Task NotifyAndDeleteSubscribersAsync(IGrouping<string, UsersDto> users, string descriptionName)
         {
-            await _parse.SaveDataBeforeNotification();
-            bool isCurrent = true;
-            var allUsers = await _apiClient.GetAllUsersAsync();
-            if (allUsers == null || !allUsers.Any()) return;
-
-            var groups = allUsers
-                .Where(u => !string.IsNullOrEmpty(u.DescriptionName))
-                .GroupBy(u => u.DescriptionName)
-                .ToList();
-
-            foreach (var group in groups)
+            foreach (var user in users)
             {
-                var descriptionName = group.Key;
+                await SendToUserAsync(
+                    Enum.Parse<PlatformType>(user.PlatformName),
+                    long.Parse(user.ChatId),
+                    $"Рассылка для \"{descriptionName}\" прекращена: этот объект больше не существует в расписании.");
+                await _apiClient.DeleteUserByIdAsync(user.Id);
+                await Task.Delay(100);
+            }
+        }
 
-                var (filepath, scheduleType) = await _fileSystem.GetFullPathFromDescriptionName(descriptionName, isCurrent);
-
-                if (scheduleType == ScheduleType.None)
-                {
-                    foreach (var user in group)
-                    {
-                        await SendToUserAsync(
-                            Enum.Parse<PlatformType>(user.PlatformName),
-                            long.Parse(user.ChatId),
-                            $"Рассылка для \"{descriptionName}\" прекращена: этот объект больше не существует в расписании.");
-
-                        await _apiClient.DeleteUserByIdAsync(user.Id);
-                        await Task.Delay(100);
-                    }
-                    continue;
-                }
-                try
-                {
-                    string scheduleText = "Появилось новое расписание!\n" + await _parse.GetScheduleFromFile(filepath);
-
-                    foreach (var user in group)
-                    {
-                        await SendToUserAsync(
-                            Enum.Parse<PlatformType>(user.PlatformName),
-                            long.Parse(user.ChatId),
-                            scheduleText);
-                        await Task.Delay(100);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, $"Ошибка парсинга расписания для {descriptionName}");
-                }
-
+        // Метод для отправки расписания по чатам
+        private async Task SendScheduleToGroupAsync(IGrouping<string, UsersDto> users, string scheduleText)
+        {
+            foreach (var user in users)
+            {
+                await SendToUserAsync(
+                    Enum.Parse<PlatformType>(user.PlatformName),
+                    long.Parse(user.ChatId),
+                    scheduleText);
+                await Task.Delay(100);
             }
         }
 
