@@ -112,6 +112,7 @@ namespace ZabgcScheduleBot.Services
             {
                 string descriptionName = group.Key;
                 var (filePath, scheduleType) = await _fileSystem.GetFullPathFromDescriptionName(descriptionName, isCurrent: true);
+                var fileName = await _fileSystem.GetFileNameFromDescriptionName(descriptionName);
 
                 if (scheduleType == ScheduleType.None)
                 {
@@ -128,10 +129,10 @@ namespace ZabgcScheduleBot.Services
                     }
                     else
                     {
-                        bool scheduleIsDifferent = await _parse.ScheduleIsDifferent(descriptionName, filePath);
+                        bool scheduleIsDifferent = await _parse.ScheduleIsDifferent(fileName, filePath);
                         if (scheduleIsDifferent)
                         {
-                            string scheduleText = "Ваше расписание было изменено:\n" + await _parse.GetScheduleFromFile(filePath);
+                            string scheduleText = "Ваше расписание было изменено:\n" + await _parse.GetScheduleFromWeb(fileName);
                             await SendScheduleToGroupAsync(group, scheduleText);
                         }
                     }
