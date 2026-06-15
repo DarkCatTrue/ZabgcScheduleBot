@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using VkNet;
 using VkNet.Model;
@@ -12,35 +13,39 @@ DotNetEnv.Env.Load();
 FileSystem file = new FileSystem();
 file.InitialCatalogs();
 
-Parse parse = new Parse();
+Parse parse = new Parse(file);
 await parse.SaveAllData();
 
 string token = DotNetEnv.Env.GetString("VkToken");
 
+var builder = WebApplication.CreateBuilder(args);
 
-var host = Host.CreateDefaultBuilder(args)
-    .ConfigureServices((context, services) =>
-    {
-    services.AddSingleton(sp =>
-    {
-        var api = new VkApi();
-        api.Authorize(new ApiAuthParams
-        {
-            AccessToken = token
-        });
-        return api;
-    });
-        
-        services.AddSingleton<Parse>();
-        services.AddSingleton<Finder>();
-        services.AddSingleton<FileSystem>();
-        services.AddSingleton<HttpClient>();
-        services.AddHttpClient<ApiClient>();
-        services.AddSingleton<NotificationService>();
-        services.AddHostedService<VkBot>();
-        services.AddHostedService<UpdateCheckerBackgroundService>();
-    })
-    .Build();
+builder.Services.AddSingleton<VkApi>(sp =>
+{
+    var api = new VkApi();
+    api.Authorize(new ApiAuthParams { AccessToken = token });
+    return api;
+});
 
-await host.RunAsync();
+builder.WebHost.UseUrls("http://*:5004");
+builder.Services.AddSingleton<Finder>();
+builder.Services.AddSingleton<FileSystem>();
+builder.Services.AddSingleton<Parse>();
+builder.Services.AddSingleton<NotificationService>();
+builder.Services.AddHttpClient<ApiClient>();
 
+builder.Services.AddSingleton<WebhookBufferService>();
+builder.Services.AddHostedService<WebhookBufferService>(sp => sp.GetRequiredService<WebhookBufferService>());
+
+builder.Services.AddHostedService<VkBot>();                      
+builder.Services.AddHostedService<UpdateCheckerBackgroundService>(); 
+
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+
+var app = builder.Build();
+
+app.UseAuthorization();
+app.MapControllers(); 
+
+await app.RunAsync();

@@ -7,24 +7,32 @@ namespace ZabgcScheduleBot.Parsing
         private static readonly string CurrentScheduleDir = "CurrentSchedule";
         private static readonly string PreviousScheduleDir = "PreviousSchedule";
         private static readonly string JsonDir = "Jsons";
-        private static string JsonPath => Path.Combine(Directory.GetCurrentDirectory(), JsonDir);
+
+        private static string BasePath => AppContext.BaseDirectory;
+
+        private static string JsonPath => Path.Combine(BasePath, JsonDir);
         private static string UpdateJson => Path.Combine(JsonPath, "Update.json");
-        private static string GroupsDirectory => Path.Combine(CurrentScheduleDir, "Groups");
-        private static string TeachersDirectory => Path.Combine(CurrentScheduleDir, "Teachers");
-        private static string AudiencesDirectory => Path.Combine(CurrentScheduleDir, "Audiences");
+
+        private static string CurrentSchedulePath => Path.Combine(BasePath, CurrentScheduleDir);
+        private static string GroupsDirectory => Path.Combine(CurrentSchedulePath, "Groups");
+        private static string TeachersDirectory => Path.Combine(CurrentSchedulePath, "Teachers");
+        private static string AudiencesDirectory => Path.Combine(CurrentSchedulePath, "Audiences");
+
+        private static string PreviousSchedulePath => Path.Combine(BasePath, PreviousScheduleDir);
 
         public void InitialCatalogs()
         {
             Directory.CreateDirectory(JsonPath);
-            Directory.CreateDirectory(CurrentScheduleDir);
+            Directory.CreateDirectory(CurrentSchedulePath);
+            Directory.CreateDirectory(PreviousSchedulePath);
+
             Directory.CreateDirectory(GroupsDirectory);
             Directory.CreateDirectory(TeachersDirectory);
             Directory.CreateDirectory(AudiencesDirectory);
 
-            Directory.CreateDirectory(PreviousScheduleDir);
-            Directory.CreateDirectory(Path.Combine(PreviousScheduleDir, "Groups"));
-            Directory.CreateDirectory(Path.Combine(PreviousScheduleDir, "Teachers"));
-            Directory.CreateDirectory(Path.Combine(PreviousScheduleDir, "Audiences"));
+            Directory.CreateDirectory(Path.Combine(PreviousSchedulePath, "Groups"));
+            Directory.CreateDirectory(Path.Combine(PreviousSchedulePath, "Teachers"));
+            Directory.CreateDirectory(Path.Combine(PreviousSchedulePath, "Audiences"));
         }
 
         public async Task RecordDates(string currentDate, string updateDate)
@@ -48,9 +56,9 @@ namespace ZabgcScheduleBot.Parsing
 
         public async Task CopyOldSchedule()
         {
-            await CopyFilesAsync(GroupsDirectory, Path.Combine(PreviousScheduleDir, "Groups"));
-            await CopyFilesAsync(TeachersDirectory, Path.Combine(PreviousScheduleDir, "Teachers"));
-            await CopyFilesAsync(AudiencesDirectory, Path.Combine(PreviousScheduleDir, "Audiences"));
+            await CopyFilesAsync(GroupsDirectory, Path.Combine(PreviousSchedulePath, "Groups"));
+            await CopyFilesAsync(TeachersDirectory, Path.Combine(PreviousSchedulePath, "Teachers"));
+            await CopyFilesAsync(AudiencesDirectory, Path.Combine(PreviousSchedulePath, "Audiences"));
         }
 
         private static Task CopyFilesAsync(string sourceDir, string destDir)
@@ -75,12 +83,11 @@ namespace ZabgcScheduleBot.Parsing
 
         public async Task<string> GetFileNameFromDescriptionName(string key)
         {
-            string rootFolder = CurrentScheduleDir;
             var files = new (string FilePath, string FolderPrefix)[]
             {
-                (Path.Combine(JsonDir, "Groups.json"), Path.Combine(rootFolder, "Groups")),
-                (Path.Combine(JsonDir, "Teachers.json"), Path.Combine(rootFolder, "Teachers")),
-                (Path.Combine(JsonDir, "Audiences.json"), Path.Combine(rootFolder, "Audiences"))
+                (Path.Combine(BasePath, JsonDir, "Groups.json"), Path.Combine(BasePath, CurrentScheduleDir, "Groups")),
+                (Path.Combine(BasePath, JsonDir, "Teachers.json"), Path.Combine(BasePath, CurrentScheduleDir, "Teachers")),
+                (Path.Combine(BasePath, JsonDir, "Audiences.json"), Path.Combine(BasePath, CurrentScheduleDir, "Audiences"))
             };
 
             foreach (var (filePath, folderPrefix) in files)
@@ -92,8 +99,7 @@ namespace ZabgcScheduleBot.Parsing
                 var token = obj[key];
                 if (token != null)
                 {
-                    string value = token.ToString();
-                    return value;
+                    return token.ToString();
                 }
             }
             return string.Empty;
@@ -104,9 +110,9 @@ namespace ZabgcScheduleBot.Parsing
             string rootFolder = isCurrent ? CurrentScheduleDir : PreviousScheduleDir;
             var files = new (string FilePath, string FolderPrefix, ScheduleType Type)[]
             {
-                (Path.Combine(JsonDir, "Groups.json"), Path.Combine(rootFolder, "Groups"), ScheduleType.Group),
-                (Path.Combine(JsonDir, "Teachers.json"), Path.Combine(rootFolder, "Teachers"), ScheduleType.TeacherOrAudience),
-                (Path.Combine(JsonDir, "Audiences.json"), Path.Combine(rootFolder, "Audiences"), ScheduleType.TeacherOrAudience)
+                (Path.Combine(BasePath, JsonDir, "Groups.json"), Path.Combine(BasePath, rootFolder, "Groups"), ScheduleType.Group),
+                (Path.Combine(BasePath, JsonDir, "Teachers.json"), Path.Combine(BasePath, rootFolder, "Teachers"), ScheduleType.TeacherOrAudience),
+                (Path.Combine(BasePath, JsonDir, "Audiences.json"), Path.Combine(BasePath, rootFolder, "Audiences"), ScheduleType.TeacherOrAudience)
             };
 
             foreach (var (filePath, folderPrefix, scheduleType) in files)

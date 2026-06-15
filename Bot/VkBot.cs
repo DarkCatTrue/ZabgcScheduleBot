@@ -399,7 +399,7 @@ namespace ZabgcScheduleBot.Bot
                 await _vkApi.Messages.SendAsync(new MessagesSendParams
                 {
                     UserId = userId,
-                    Message = $"Вы успешно подписались на обновления: {input}",
+                    Message = $"Вы успешно подписались на уведомления: {input}",
                     RandomId = new Random().Next()
                 });
             }

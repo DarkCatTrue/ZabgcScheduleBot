@@ -7,13 +7,20 @@ namespace ZabgcScheduleBot.Parsing
 {
     public class Parse
     {
-        FileSystem fileSystem = new FileSystem();
+        private readonly FileSystem _fileSystem;
+        private readonly string _basePath;
+        public Parse(FileSystem fileSystem)
+        {
+            _fileSystem = fileSystem;
+            _basePath = AppContext.BaseDirectory;
+        }
+
+        private string GetFullPath(string relativePath) => Path.Combine(_basePath, relativePath);
+
         public async Task<string[]> GetDates()
         {
             string urlSchedule = DotNetEnv.Env.GetString("Url_Schedule");
-
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-
             var web = new HtmlWeb();
             web.OverrideEncoding = Encoding.GetEncoding(1251);
             var doc = await web.LoadFromWebAsync($"{urlSchedule}/hg.htm");
@@ -26,80 +33,83 @@ namespace ZabgcScheduleBot.Parsing
 
             return [dateText, updateText];
         }
+
         public async Task SaveAllData()
         {
             await SaveJsons();
             await SaveAllPages();
             await RecordUpdateDates();
-            await fileSystem.CopyOldSchedule();
+            await _fileSystem.CopyOldSchedule();
         }
+
         public async Task SaveDataBeforeNotification()
         {
-            await fileSystem.CopyOldSchedule();
+            await _fileSystem.CopyOldSchedule();
             await SaveAllPages();
         }
+
         public async Task RecordUpdateDates()
         {
-            string[] dates = new string[1];
-            dates = await GetDates();
+            string[] dates = await GetDates();
             string currentDate = dates[0];
             string updateDate = dates[1];
-            await fileSystem.RecordDates(currentDate, updateDate);
+            await _fileSystem.RecordDates(currentDate, updateDate);
         }
 
         public async Task SaveJsons()
         {
-            await SaveData("cg.htm", "Jsons\\Groups.json");
-            await SaveData("cp.htm", "Jsons\\Teachers.json");
-            await SaveData("ca.htm", "Jsons\\Audiences.json");
+            await SaveData("cg.htm", GetFullPath("Jsons/Groups.json"));
+            await SaveData("cp.htm", GetFullPath("Jsons/Teachers.json"));
+            await SaveData("ca.htm", GetFullPath("Jsons/Audiences.json"));
         }
 
-        // Сохранение списка групп, аудиторий, преподавателей в json
-        private async Task SaveData(string fileName, string jsonName)
+        private async Task SaveData(string fileName, string jsonPath)
         {
             string urlSchedule = DotNetEnv.Env.GetString("Url_Schedule");
-
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-
             var web = new HtmlWeb();
             web.OverrideEncoding = Encoding.GetEncoding(1251);
             var doc = await web.LoadFromWebAsync($"{urlSchedule}/{fileName}");
 
             var dict = new Dictionary<string, string>();
-
             foreach (var node in doc.DocumentNode.SelectNodes("//a[@class='z0']"))
             {
                 dict[node.InnerText.Trim()] = node.GetAttributeValue("href", "");
             }
 
-            await File.WriteAllTextAsync($"{jsonName}", JsonConvert.SerializeObject(dict));
+            string directory = Path.GetDirectoryName(jsonPath);
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+
+            await File.WriteAllTextAsync(jsonPath, JsonConvert.SerializeObject(dict));
         }
 
         public async Task SaveAllPages()
         {
-            await SaveSchedulePages("Jsons\\Groups.json", "CurrentSchedule\\Groups");
-            await SaveSchedulePages("Jsons\\Audiences.json", "CurrentSchedule\\Audiences");
-            await SaveSchedulePages("Jsons\\Teachers.json", "CurrentSchedule\\Teachers");
+            await SaveSchedulePages(GetFullPath("Jsons/Groups.json"), GetFullPath("CurrentSchedule/Groups"));
+            await SaveSchedulePages(GetFullPath("Jsons/Audiences.json"), GetFullPath("CurrentSchedule/Audiences"));
+            await SaveSchedulePages(GetFullPath("Jsons/Teachers.json"), GetFullPath("CurrentSchedule/Teachers"));
         }
 
-        public async Task SaveSchedulePages(string jsonName, string destinaton)
+        public async Task SaveSchedulePages(string jsonPath, string destinationFolder)
         {
             string urlSchedule = DotNetEnv.Env.GetString("Url_Schedule");
-
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-
             var web = new HtmlWeb();
             web.OverrideEncoding = Encoding.GetEncoding(1251);
 
-            string json = await File.ReadAllTextAsync(jsonName);
+            string json = await File.ReadAllTextAsync(jsonPath);
             var jObject = JObject.Parse(json);
 
             foreach (var property in jObject.Properties())
             {
                 JToken value = property.Value;
                 var doc = await web.LoadFromWebAsync($"{urlSchedule}/{value.ToString()}");
-                string path = $"{destinaton}\\{value.ToString()}";
-                doc.Save(path);
+                string filePath = Path.Combine(destinationFolder, value.ToString());
+                string dir = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrEmpty(dir))
+                    Directory.CreateDirectory(dir);
+                doc.Save(filePath);
             }
         }
 
@@ -120,11 +130,7 @@ namespace ZabgcScheduleBot.Parsing
         {
             string webSchedule = await GetScheduleFromWeb(fileName);
             string fileSchedule = await GetScheduleFromFile(filePath);
-            if (webSchedule != fileSchedule)
-            {
-                return true;
-            }
-            return false;
+            return webSchedule != fileSchedule;
         }
 
         private async Task<HtmlDocument> LoadHtmlFromWebAsync(string url)
@@ -140,7 +146,6 @@ namespace ZabgcScheduleBot.Parsing
             var doc = new HtmlDocument();
             doc.Load(fileName, Encoding.GetEncoding(1251));
             return doc;
-
         }
 
         public string ParseSchedule(HtmlDocument doc)
