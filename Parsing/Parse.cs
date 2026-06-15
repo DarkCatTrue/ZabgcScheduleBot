@@ -19,7 +19,7 @@ namespace ZabgcScheduleBot.Parsing
 
         public async Task<string[]> GetDates()
         {
-            string urlSchedule = DotNetEnv.Env.GetString("Url_Schedule");
+            string urlSchedule = Environment.GetEnvironmentVariable("Url_Schedule");
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
             var web = new HtmlWeb();
             web.OverrideEncoding = Encoding.GetEncoding(1251);
@@ -65,7 +65,7 @@ namespace ZabgcScheduleBot.Parsing
 
         private async Task SaveData(string fileName, string jsonPath)
         {
-            string urlSchedule = DotNetEnv.Env.GetString("Url_Schedule");
+            string urlSchedule = Environment.GetEnvironmentVariable("Url_Schedule");
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
             var web = new HtmlWeb();
             web.OverrideEncoding = Encoding.GetEncoding(1251);
@@ -93,7 +93,7 @@ namespace ZabgcScheduleBot.Parsing
 
         public async Task SaveSchedulePages(string jsonPath, string destinationFolder)
         {
-            string urlSchedule = DotNetEnv.Env.GetString("Url_Schedule");
+            string urlSchedule = Environment.GetEnvironmentVariable("Url_Schedule");
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
             var web = new HtmlWeb();
             web.OverrideEncoding = Encoding.GetEncoding(1251);
@@ -115,7 +115,7 @@ namespace ZabgcScheduleBot.Parsing
 
         public async Task<string> GetScheduleFromWeb(string fileName)
         {
-            string url = $"{DotNetEnv.Env.GetString("Url_Schedule")}/{fileName}";
+            string url = $"{Environment.GetEnvironmentVariable("Url_Schedule")}/{fileName}";
             var doc = await LoadHtmlFromWebAsync(url);
             return ParseSchedule(doc);
         }

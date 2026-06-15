@@ -10,7 +10,7 @@ namespace ZabgcScheduleBot.Services
         private readonly ILogger<WebhookBufferService> _logger;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly TimeSpan _interval = TimeSpan.FromMinutes(10);
-        private readonly string _staticUrl = DotNetEnv.Env.GetString("Url_Exams");
+        private readonly string _staticUrl = Environment.GetEnvironmentVariable("Url_Exams");
         private Timer _timer;
 
         public WebhookBufferService(ILogger<WebhookBufferService> logger, IServiceScopeFactory scopeFactory)

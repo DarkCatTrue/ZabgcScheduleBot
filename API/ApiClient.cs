@@ -9,13 +9,15 @@ namespace ZabgcScheduleBot.API
     public class ApiClient
     {
         private readonly HttpClient _httpClient;
-
+        private string headderKey = Environment.GetEnvironmentVariable("HEADDER_KEY");
+        private string apiKey = Environment.GetEnvironmentVariable("API_KEY");
+        private  string apiUrl = Environment.GetEnvironmentVariable("API_URL");
         public ApiClient(HttpClient httpClient)
         {
             _httpClient = httpClient;
-            _httpClient.BaseAddress = new Uri("http://localhost:5046/");
+            _httpClient.BaseAddress = new Uri(apiUrl);
             _httpClient.DefaultRequestHeaders.Accept.Clear();
-            _httpClient.DefaultRequestHeaders.Add("X-API-KEY", "qwerty");
+            _httpClient.DefaultRequestHeaders.Add(headderKey, apiKey);
         }
         public async Task<List<UsersDto>?> GetAllUsersAsync()
         {
