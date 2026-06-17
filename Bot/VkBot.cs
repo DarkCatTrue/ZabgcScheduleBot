@@ -1,7 +1,4 @@
-﻿using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Linq;
-using Sprache;
+﻿using Newtonsoft.Json.Linq;
 using System.Collections.Concurrent;
 using VkNet;
 using VkNet.Enums.StringEnums;
@@ -134,9 +131,8 @@ namespace ZabgcScheduleBot.Bot
 
             long fromId = update[3].Value<long>();
             string text = update[6]?.Value<string>() ?? "";
-            bool isReply = update[7] is JObject extra && extra["reply"] != null;
 
-            if (_userStates.TryGetValue(fromId, out var state) && state.Step != DialogStep.None && isReply)
+            if (_userStates.TryGetValue(fromId, out var state) && state.Step != DialogStep.None)
             {
                 switch (state.Step)
                 {
@@ -294,7 +290,7 @@ namespace ZabgcScheduleBot.Bot
         private async Task StartScheduleFlow(long userId, CancellationToken ct)
         {
             await SendMainKeyboard(userId,
-                "Для просмотра предыдущего расписания, нажмите «Ответить» на моё сообщение и введите один из параметров на выбор:" +
+                "Для просмотра предыдущего расписания введите один из параметров на выбор:" +
                 "\n\n1. Название группы" +
                 "\n2. ФИО преподавателя" +
                 "\n3. Номер аудитории" +
@@ -314,7 +310,7 @@ namespace ZabgcScheduleBot.Bot
             if (user == null)
             {
                 await SendMainKeyboard(userId,
-                    "Для подписки на рассылку уведомлений, нажмите «Ответить» на моё сообщение и введите один из параметров на выбор:" +
+                    "Для подписки на рассылку уведомлений введите один из параметров на выбор:" +
                     "\n\n1. Название группы" +
                     "\n2. ФИО преподавателя" +
                     "\n3. Номер аудитории" +
@@ -345,8 +341,7 @@ namespace ZabgcScheduleBot.Bot
                 "\nА это то, что я умею:" +
                 "\n\n1. Отправлять новое и изменённое расписание занятий и экзаменов для групп, преподавателей и аудиторий" +
                 "\n2. Показывать предыдущее расписание занятий для групп, преподавателей и аудиторий." +
-                "\n\nДля начала моей работы необходимо перейти в -> Управление уведомлениями -> Подписаться на уведомления. Это позволит мне присылать актуальное расписание в этот чат." +
-                "\n\nСтоит отметить, что я реагирую только если вы нажали кнопку «Ответить» конкретно на моё сообщение, в ином случае все сообщения в чате будут проигнорированы."
+                "\n\nДля начала моей работы необходимо перейти в -> Управление уведомлениями -> Подписаться на уведомления. Это позволит мне присылать актуальное расписание в этот чат."
                 , ct);
         }
 
